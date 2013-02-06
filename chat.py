@@ -40,20 +40,22 @@ class Chat:
         
         for y in range(0, termsize[1] - 2):
             try:
-                timestamp = " on {0}-{1}-{2} at {3:02d}:{4}".format(subqueue[y][1].year,
-                                                                subqueue[y][1].month,
-                                                                subqueue[y][1].day,
-                                                                subqueue[y][1].hour,
-                                                                subqueue[y][1].minute
-                                                                )
-                plaintext = subqueue[y][0] + timestamp + ": " + subqueue[y][2] #currently items are tuples of (screen_name, msg)
+                plaintext = subqueue[y]
+                if not isinstance(subqueue[y], str): #for messages where the queue item is a string, just display that (like system notices), otherwise parse like usual
+                    #need better error checking
+                    timestamp = " on {0:02d}-{1:02d}-{2:02d} at {3:02d}:{4:02d}".format(subqueue[y][1].year,
+                                                                    subqueue[y][1].month,
+                                                                    subqueue[y][1].day,
+                                                                    subqueue[y][1].hour,
+                                                                    subqueue[y][1].minute
+                                                                    )
+                    plaintext = subqueue[y][0] + timestamp + ": " + subqueue[y][2] #currently items are tuples of (screen_name, msg)
                 self.stdscr.addstr(y, 0, plaintext)
             except IndexError:
                 pass
     
     def addMessage(self, msg):
         self.message_queue.append(msg)
-        self.refreshQueue()
     
     def render(self):
         if not self._has_rendered:

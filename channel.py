@@ -17,8 +17,10 @@ class Channel:
     def close(self):
         if self.socket is not None:
             self.socket.close()
+            self.socket = None
         if self.connection is not None:
             self.connection.close()
+            self.connection = None
     
     def sendMessage(self, message):
         if self.connection is None:
@@ -51,9 +53,9 @@ class Listener(Channel):
             self.socket.listen(1)
             self.connection, self.client_address = self.socket.accept()
             self.connection.setblocking(0)
+            return ("Success.", 0)
         except socket.error:
-            print "Address is already in use or port is unusable." #make more informative
-            exit(-1)
+            return ("Address is already in use or port is unusable.", -3) #make more informative
     def listen_non_blocking(self):
         pass
     
@@ -67,8 +69,8 @@ class Client(Channel):
             self.socket.connect((self.address, self.port))
             self.connection = self.socket
             self.connection.setblocking(0)
+            return ("Success.", 0)
         except socket.error:
-            print "The connection was refused or failed!" #make more informative
-            exit(-1)
+            return ("The connection was refused or failed!", -3) #make more informative
     
     
