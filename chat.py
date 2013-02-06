@@ -109,6 +109,11 @@ class Chat:
             if out_msg[0] == "/": #forward slash at the start of a message indicates a command sequence, do not add it to the queue, only yield back the corresponding code
                 if out_msg == "/quit":
                     yield -2
+                elif out_msg[0:len("/name ")] == "/name ":
+                    self.setName(out_msg[len("/name "):])
+                    self.addMessage("You are now known as '{0}'".format(self.screen_name))
+                    #add a 'getLastMesage' so that the parent code can extract the last message on a certain return code and send it to the other party, such as this message (though modified)
+                    yield -1
             else:
                 out_tuple = (self.screen_name, datetime.now(), out_msg)
                 self.addMessage(out_tuple)
