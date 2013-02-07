@@ -46,7 +46,7 @@ class Channel:
 class Listener(Channel):
     
     def __init__(self, port):
-        Channel.__init__(self, "localhost", port)
+        Channel.__init__(self, "", port)
     
     def listen(self):
         while self.connection_type is None:

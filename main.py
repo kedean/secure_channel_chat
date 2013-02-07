@@ -12,6 +12,7 @@ if __name__ == '__main__':
     #parse out arguments
     found_arg = None
     initial_connect_address = None
+    initial_screen_name = None
     
     for arg in sys.argv:
         if found_arg is not None:
@@ -24,6 +25,8 @@ if __name__ == '__main__':
                 except:
                     print "Port must be an integer value."
                     exit(-1)
+            elif found_arg == "name" or found_arg == "n":
+                initial_screen_name = arg
         elif arg[0] == "-":
             found_arg = arg[1:]
             
@@ -51,12 +54,12 @@ if __name__ == '__main__':
             now = datetime.now()
             ch.addMessage("Chat began on {0:02d}-{1:02d}-{2:02d} at {3:02d}:{4:02d}".format(now.year, now.month, now.day,  now.hour, now.minute))
         
-        ch.setName("Client")
+        ch.setName(initial_screen_name if initial_screen_name is not None else "Client")
     else:
         connection = channel.Listener(port)
         listener = connection.listen()
         
-        ch.setName("Server")
+        ch.setName(initial_screen_name if initial_screen_name is not None else "Server")
     
     #initialize the chat box and start running
     
@@ -102,6 +105,8 @@ if __name__ == '__main__':
                 print result
                 exit(-3)
             elif result_code == 0: #remote connection was made, we are a client!
+                if ch.screen_name == "Server":
+                    ch.setName("Client")
                 now = datetime.now()
                 ch.addMessage("Chat began on {0:02d}-{1:02d}-{2:02d} at {3:02d}:{4:02d}".format(now.year, now.month, now.day,  now.hour, now.minute))
                 ch.refreshQueue()
@@ -149,3 +154,5 @@ if __name__ == '__main__':
                     ch.addMessage(data)
                     ch.refreshQueue()
             #a -2 error code means nothing has occured, so we'll go ahead and keep moving
+        
+        time.sleep(0.01)
