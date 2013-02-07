@@ -23,7 +23,7 @@ if __name__ == '__main__':
                 try:
                     port = int(arg)
                 except:
-                    print "Port must be an integer value."
+                    print("Port must be an integer value.")
                     exit(-1)
             elif found_arg == "name" or found_arg == "n":
                 initial_screen_name = arg
@@ -48,7 +48,7 @@ if __name__ == '__main__':
         if result_code == -3: #connection refusal occurred
             ch.close()
             connection.close()
-            print result
+            print(result)
             exit(-3)
         elif result_code == 0: #remote connection was made, we are a client!
             now = datetime.now()
@@ -76,7 +76,7 @@ if __name__ == '__main__':
         
         if code == -2: #-2 indicates the user typed the 'quit' command sequence, send an indication to the other party and exit
             ch.close()
-            print "\nTerminating connection."
+            print("\nTerminating connection.")
             
             text_to_send = pickle.dumps("/quit")
             result, error = connection.sendMessage(text_to_send)
@@ -102,7 +102,7 @@ if __name__ == '__main__':
             if result_code == -3: #connection refusal occurred
                 ch.close()
                 connection.close()
-                print result
+                print(result)
                 exit(-3)
             elif result_code == 0: #remote connection was made, we are a client!
                 if ch.screen_name == "Server":
@@ -116,7 +116,7 @@ if __name__ == '__main__':
             if error == -1: #problem!
                 ch.close()
                 connection.close()
-                print "\nConnection was lost!"
+                print("\nConnection was lost!")
                 exit(-1)
             else: #success!
                 pass
@@ -128,7 +128,7 @@ if __name__ == '__main__':
             if error == -1: #problem!
                 ch.close()
                 connection.close()
-                print "\nConnection was lost!"
+                print("\nConnection was lost!")
                 exit(-1)
             elif error == 0 : #success!
                 ch.addMessage(msg)
@@ -139,7 +139,7 @@ if __name__ == '__main__':
             if error == -1:
                 ch.close()
                 connection.close()
-                print "{0}: {1}".format(error, result)
+                print("{0}: {1}".format(error, result))
                 exit(-2)
             elif error == 0: #got a real message!
                 #using the previous definition, unpack the message received
@@ -148,7 +148,7 @@ if __name__ == '__main__':
                 if data == "/quit": #quit sequence, the other party ended their session.
                     ch.close()
                     connection.close()
-                    print "\nConnection was terminated by other party."
+                    print("\nConnection was terminated by other party.")
                     exit(0)
                 else:
                     ch.addMessage(data)

@@ -1,4 +1,3 @@
-import terminal
 import sys
 import curses
 import os
@@ -34,13 +33,13 @@ class Chat:
         self.screen_name = name
     
     def refreshQueue(self):
-        termsize = terminal.getTerminalSize()
+        termsize = self.stdscr.getmaxyx()
         subqueue = self.message_queue
     
-        if len(self.message_queue) > termsize[1] - 2:
-            subqueue = self.message_queue[0 - (termsize[1] - 2):]
+        if len(self.message_queue) > termsize[0] - 2:
+            subqueue = self.message_queue[0 - (termsize[0] - 2):]
         
-        for y in range(0, termsize[1] - 2):
+        for y in range(0, termsize[0] - 2):
             try:
                 plaintext = subqueue[y]
                 if not isinstance(subqueue[y], str): #for messages where the queue item is a string, just display that (like system notices), otherwise parse like usual
@@ -67,13 +66,13 @@ class Chat:
             
             self.refreshQueue()
             
-            termsize = terminal.getTerminalSize()
+            termsize = self.stdscr.getmaxyx()
             
             msg = []
             cursor = 0
             
-            self.stdscr.addstr(termsize[1]-1, 0, "Message: " + (" " * (termsize[0] - 1 - len("Message: "))))
-            self.stdscr.move(termsize[1] - 1, len("Message: "))
+            self.stdscr.addstr(termsize[0]-1, 0, "Message: " + (" " * (termsize[1] - 1 - len("Message: "))))
+            self.stdscr.move(termsize[0] - 1, len("Message: "))
             
             while True:
                 c = self.stdscr.getch()
@@ -83,14 +82,14 @@ class Chat:
                     elif c == 127 and cursor > 0:
                         del msg[cursor - 1]
                         cursor -= 1
-                        self.stdscr.move(termsize[1]-1, 0)
+                        self.stdscr.move(termsize[0]-1, 0)
                         self.stdscr.clrtoeol()
-                        self.stdscr.addstr(termsize[1]-1, 0, "Message: " + "".join(msg))
+                        self.stdscr.addstr(termsize[0]-1, 0, "Message: " + "".join(msg))
                     elif c >= 32 and c <= 126:
-                        self.stdscr.move(termsize[1]-1, 0)
+                        self.stdscr.move(termsize[0]-1, 0)
                         self.stdscr.clrtoeol()
                         msg.insert(cursor, chr(c))
-                        self.stdscr.addstr(termsize[1]-1, 0, "Message: " + "".join(msg))
+                        self.stdscr.addstr(termsize[0]-1, 0, "Message: " + "".join(msg))
                         
                         cursor += 1
                     elif c == curses.KEY_LEFT: #left control sequence
@@ -102,7 +101,7 @@ class Chat:
                     else:
                         pass
                         
-                self.stdscr.move(termsize[1] - 1, len("Message: ") + cursor) #this needs to be done every time, or else the cursor will be shifted when messages are received
+                self.stdscr.move(termsize[0] - 1, len("Message: ") + cursor) #this needs to be done every time, or else the cursor will be shifted when messages are received
                     
                 yield ("character checked.", -1)
             
