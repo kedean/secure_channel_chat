@@ -7,9 +7,11 @@ from datetime import datetime
 class Chat:
     _has_rendered = False
     
-    def __init__(self, screen_name="_"):
+    def __init__(self, screen_name="_", init=False):
         self.message_queue = []
         self.screen_name = screen_name
+        if init:
+            self.init()
         
     def __del__(self):
         self.close()
@@ -102,22 +104,23 @@ class Chat:
                         
                 self.stdscr.move(termsize[1] - 1, len("Message: ") + cursor) #this needs to be done every time, or else the cursor will be shifted when messages are received
                     
-                yield -1
+                yield ("character checked.", -1)
             
             out_msg = "".join(msg)
             
             if out_msg[0] == "/": #forward slash at the start of a message indicates a command sequence, do not add it to the queue, only yield back the corresponding code
                 if out_msg == "/quit":
-                    yield -2
+                    yield ("quitting", -2)
                 elif out_msg[0:len("/name ")] == "/name ":
                     self.setName(out_msg[len("/name "):])
                     self.addMessage("You are now known as '{0}'".format(self.screen_name))
                     #add a 'getLastMesage' so that the parent code can extract the last message on a certain return code and send it to the other party, such as this message (though modified)
-                    yield -1
+                    yield (self.screen_name, 1)
+                elif out_msg[0:len("/connect ")] == "/connect ":
+                    yield (out_msg[len("/connect "):], 2)
             else:
                 out_tuple = (self.screen_name, datetime.now(), out_msg)
-                self.addMessage(out_tuple)
-                yield out_tuple
+                yield (out_tuple, 0)
         
         return
     def shouldRefresh(self):

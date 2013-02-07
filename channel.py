@@ -7,6 +7,7 @@ class Channel:
     port = 8000
     connection, client_address = None, None
     buffer_size = 4096
+    connection_type = None
     
     def __init__(self, address, port):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -24,15 +25,15 @@ class Channel:
     
     def sendMessage(self, message):
         if self.connection is None:
-            return ("No connection.", -1)
+            return ("No connection.", -2)
         try:
             self.connection.send(message)
             return ("Success.", 0)
         except Exception:
             return ("An exception occurred in transport.", -1)
     def receiveMessage(self):
-        if self.connection is None:
-            return ("No connection exists.", -1)
+        if self.connection is None or self.connection_type is None:
+            return ("No connection exists.", -3)
         try:
             data = self.connection.recv(self.buffer_size)
             if data:
@@ -48,14 +49,22 @@ class Listener(Channel):
         Channel.__init__(self, "localhost", port)
     
     def listen(self):
-        try:
-            self.socket.bind((self.address, self.port))
-            self.socket.listen(1)
-            self.connection, self.client_address = self.socket.accept()
-            self.connection.setblocking(0)
-            return ("Success.", 0)
-        except socket.error:
-            return ("Address is already in use or port is unusable.", -3) #make more informative
+        while self.connection_type is None:
+            try:
+                self.socket.bind((self.address, self.port))
+                self.socket.listen(1)
+                self.socket.setblocking(0)
+                while self.connection is None:
+                    try:
+                        self.connection, self.client_address = self.socket.accept()
+                        break
+                    except:
+                        yield ("No connection made.", -1)
+                self.connection.setblocking(0)
+                self.connection_type = "server"
+                yield ("Success.", 0)
+            except socket.error:
+                yield ("Address is already in use or port is unusable.", -3) #make more informative
     def listen_non_blocking(self):
         pass
     
@@ -69,6 +78,7 @@ class Client(Channel):
             self.socket.connect((self.address, self.port))
             self.connection = self.socket
             self.connection.setblocking(0)
+            self.connection_type = "client"
             return ("Success.", 0)
         except socket.error:
             return ("The connection was refused or failed!", -3) #make more informative
