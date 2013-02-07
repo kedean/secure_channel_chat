@@ -31,8 +31,9 @@ if __name__ == '__main__':
             found_arg = arg[1:]
             
     
+    
     #create but DO NOT YET initialize the chat window, this way error and results can still be posted first
-    ch = chat.Chat()
+    ch = chat.Chat(log=True)
     ch.addMessage("Listening for connections...")
     
     #connection = None

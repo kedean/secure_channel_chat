@@ -5,16 +5,26 @@ from datetime import datetime
 
 class Chat:
     _has_rendered = False
+    _log_file = None
     
-    def __init__(self, screen_name="_", init=False):
+    def __init__(self, screen_name="_", init=False, log=False):
         self.message_queue = []
         self.screen_name = screen_name
+        if log:
+            if os.path.exists("logs/") == False:
+                os.mkdir("logs/")
+            filename = "logs/log_{0}.txt".format(datetime.now())
+            log_file = open(filename, "w")
+            self._log_file = log_file
         if init:
             self.init()
         
     def __del__(self):
         self.close()
     def close(self):
+        if self._log_file is not None:
+            self._log_file.close()
+            self._log_file = None
         if self._has_rendered:
             curses.endwin()
             #os.system("clear")
@@ -35,7 +45,7 @@ class Chat:
     def refreshQueue(self):
         termsize = self.stdscr.getmaxyx()
         subqueue = self.message_queue
-    
+        
         if len(self.message_queue) > termsize[0] - 2:
             subqueue = self.message_queue[0 - (termsize[0] - 2):]
         
@@ -57,6 +67,20 @@ class Chat:
     
     def addMessage(self, msg):
         self.message_queue.append(msg)
+        if self._log_file is not None:
+            for msg in self.message_queue:
+                plaintext = msg
+                if not isinstance(msg, str): #for messages where the queue item is a string, just display that (like system notices), otherwise parse like usual
+                    timestamp = " on {0:02d}-{1:02d}-{2:02d} at {3:02d}:{4:02d}".format(
+                        msg[1].year,
+                        msg[1].month,
+                        msg[1].day,
+                        msg[1].hour,
+                        msg[1].minute
+                        )
+                    plaintext = msg[0] + timestamp + ": " + msg[2]
+                self._log_file.write(plaintext + "\n")
+        
     
     def render(self):
         if not self._has_rendered:
@@ -68,7 +92,7 @@ class Chat:
             
             termsize = self.stdscr.getmaxyx()
             
-            msg = []
+            msg = [] #set up as an array of characters so that insertion/deletion is easy (backspace/delete/etc)
             cursor = 0
             
             self.stdscr.addstr(termsize[0]-1, 0, "Message: " + (" " * (termsize[1] - 1 - len("Message: "))))
