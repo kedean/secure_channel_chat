@@ -12,6 +12,7 @@ if __name__ == '__main__':
     found_arg = None
     initial_connect_address = None
     initial_screen_name = None
+    do_logging = "-log" in sys.argv
     
     for arg in sys.argv:
         if found_arg is not None:
@@ -32,7 +33,7 @@ if __name__ == '__main__':
     
     
     #create but DO NOT YET initialize the chat window, this way error and results can still be posted first
-    ch = chat.Chat(log=True)
+    ch = chat.Chat(log=do_logging)
     ch.pushMessage("Listening for connections...")
     
     #connection = None
@@ -71,7 +72,7 @@ if __name__ == '__main__':
             if result_code == 0: #remote connection was made, we are a server!
                 now = datetime.now()
                 ch.pushMessage("Received connection from {0}".format(connection.client_address[0]))
-                ch.pushMessage("Performing handshakes...", refresh=True)
+                ch.pushMessage("Performing handshakes", refresh=True)
                 connection.doHandshakes()
                 ch.pushMessage("Chat began on {0:02d}-{1:02d}-{2:02d} at {3:02d}:{4:02d}".format(now.year, now.month, now.day,  now.hour, now.minute), refresh=True)
         
