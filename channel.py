@@ -6,6 +6,7 @@ from Crypto.Cipher import PKCS1_OAEP
 from Crypto.Random import random
 from Crypto.Cipher import AES
 from Crypto.Util import Counter
+from Crypto.Hash import SHA256
 
 import base64
 
@@ -134,7 +135,7 @@ class Channel:
                 try:
                     exp2 = long(self._rsa_cipher.decrypt(msg))
                 except Exception as e:
-                    exit("could not decrypt")
+                    exit()
         
         self._shared_key = buffer(self._int_to_bytes(exp1 ^ exp2, 256 / 8))
         
@@ -170,12 +171,36 @@ class Channel:
         msg_crypt = self._rsa_othercipher.encrypt(str(exp2))
         self.sendMessage(base64.b64encode(msg_crypt))
         
-        self._shared_key = buffer(self._int_to_bytes(exp1 ^ exp2, 256 / 8))
+        self._shared_key = (self._int_to_bytes(exp1 ^ exp2, 256 / 8))
         
     def _initSecureChannel(self):
+        hasher = SHA256.new()
+        hasher.update(self._shared_key)
+        hasher.update("client sends to server")
+        enc_send_key = hasher.digest()
+        
+        hasher = SHA256.new()
+        hasher.update(self._shared_key)
+        hasher.update("server sends to client")
+        enc_recv_key = hasher.digest()
+        
+        hasher = SHA256.new()
+        hasher.update(self._shared_key)
+        hasher.update("client auths to server")
+        auth_send_key = hasher.digest()
+        
+        hasher = SHA256.new()
+        hasher.update(self._shared_key)
+        hasher.update("server auths to client")
+        auth_recv_key = hasher.digest()
+        
+        if self.connection_type == "server": #swap dem
+            enc_send_key, enc_recv_key = enc_recv_key, enc_send_key
+            auth_send_key, auth_recv_key = auth_recv_key, auth_send_key
+        
         ctr = Counter.new(128)
-        self._encrypt_cipher = AES.new(self._shared_key, AES.MODE_CTR, counter=ctr)
-        self._decrypt_cipher = AES.new(self._shared_key, AES.MODE_CTR, counter=ctr)
+        self._encrypt_cipher = AES.new(enc_send_key, AES.MODE_CTR, counter=ctr)
+        self._decrypt_cipher = AES.new(enc_recv_key, AES.MODE_CTR, counter=ctr)
     
     def doHandshakes(self):
         if self.connection_type == "server":
