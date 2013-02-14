@@ -1,11 +1,13 @@
 import sys
 import time
 
-import controller
+from controller import *
 
 if __name__ == '__main__':
     
     port = 8000
+    
+    FRAMESLEEP = 0.01
     
     #parse out arguments
     found_arg = None
@@ -30,10 +32,10 @@ if __name__ == '__main__':
             found_arg = arg[1:]
             
     
-    control = controller.SecureChatController(port, initial_screen_name, initial_connect_address, do_logging)
-    success, return_val = True, None
-    while success:
-        success, return_val = control.renderLoop()
-        time.sleep(0.01)
+    control = SecureChatController(port, initial_screen_name, initial_connect_address, do_logging)
+    control_running, control_return = True, None
+    while control_running:
+        control_running, control_return = control.renderLoop()
+        time.sleep(FRAMESLEEP)
         
-    print return_val
+    print control_return
