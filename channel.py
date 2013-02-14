@@ -7,6 +7,7 @@ from Crypto.Random import random
 from Crypto.Cipher import AES
 from Crypto.Util import Counter
 from Crypto.Hash import SHA256
+from Crypto.Hash import HMAC
 
 import base64
 
@@ -29,6 +30,9 @@ class Channel:
     _shared_key = None
     _encrypt_cipher = None
     _decrypt_cipher = None
+    
+    _num_msg_sent = 0
+    _num_msg_recv = 0
     
     def __init__(self, address, port):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -65,12 +69,17 @@ class Channel:
                 message = "\x02".join(message_list)
                 
         
-        with open("log.txt", "a") as log:
-            log.write("d\n")
-        
         try:
             if self._encrypt_cipher is not None:
                 message = base64.b64encode(self._encrypt_cipher.encrypt(message))
+                
+                authenticator_hasher = HMAC.new(self._auth_send_hmac, digestmod=SHA256.new())
+                authenticator_hasher.update(message)
+                authenticator_hasher.update(str(self._num_msg_sent))
+                authenticator = authenticator_hasher.hexdigest()
+                
+                message = "{0}{1}".format(authenticator, message)
+                self._num_msg_sent += 1
         except:
             return ("An exception occurred in encryption.", -3)
         else:
@@ -86,8 +95,18 @@ class Channel:
             return ("No connection exists.", -3)
         try:
             data = self.connection.recv(self.buffer_size)
-            if data:
+            if data is not None and len(data) > 0:
                 if self._decrypt_cipher is not None:
+                    authenticator, data = data[0:64], data[64:]
+                    reauthentication_hasher = HMAC.new(self._auth_recv_hmac, digestmod=SHA256.new())
+                    reauthentication_hasher.update(data)
+                    reauthentication_hasher.update(str(self._num_msg_recv))
+                    reauthenticator = reauthentication_hasher.hexdigest()
+                    
+                    if reauthenticator != authenticator:
+                        return ("Authentication of message failed.", -4)
+                    
+                    self._num_msg_recv += 1
                     
                     data = self._decrypt_cipher.decrypt(base64.b64decode(data))
                     
@@ -198,9 +217,12 @@ class Channel:
             enc_send_key, enc_recv_key = enc_recv_key, enc_send_key
             auth_send_key, auth_recv_key = auth_recv_key, auth_send_key
         
-        ctr = Counter.new(128)
-        self._encrypt_cipher = AES.new(enc_send_key, AES.MODE_CTR, counter=ctr)
-        self._decrypt_cipher = AES.new(enc_recv_key, AES.MODE_CTR, counter=ctr)
+        self._encrypt_cipher = AES.new(enc_send_key, AES.MODE_CTR, counter=Counter.new(128))
+        self._decrypt_cipher = AES.new(enc_recv_key, AES.MODE_CTR, counter=Counter.new(128))
+        
+        self._auth_send_hmac = auth_send_key
+        self._auth_recv_hmac = auth_recv_key
+        
     
     def doHandshakes(self):
         if self.connection_type == "server":

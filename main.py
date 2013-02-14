@@ -103,10 +103,11 @@ if __name__ == '__main__':
             connection = channel.Client(remote_address, port)
             result, result_code = connection.connect() #this one isn't non-blocking, gotta wait!
             if result_code == -3: #connection refusal occurred
-                ch.close()
                 connection.close()
-                print(result)
-                exit(-3)
+                connection = channel.Listener(port)
+                listener = connection.listen()
+                ch.pushMessage("The connection was refused!")
+                ch.pushMessage("Listening for connections...", refresh=True)
             elif result_code == 0: #remote connection was made, we are a client!
                 ch.pushMessage("{0}...Connection established".format(ch.popMessage()))
                 ch.pushMessage("Performing handshakes", refresh=True)
@@ -146,12 +147,20 @@ if __name__ == '__main__':
             if error == -1:
                 ch.close()
                 connection.close()
-                print("{0}: {1}".format(error, result))
+                print("\nConnection was terminated by other party.")
+                exit(-2)
+            elif error == -4: #bad authentication
+                ch.close()
+                connection.close()
+                print("\nMessage contained a bad authenticator, a message was lost in transit or someone is modifying your communications.")
+                print("Halting.")
                 exit(-2)
             elif error == 0: #got a real message!
                 #using the previous definition, unpack the message received
                 data = result
-                
+                if ch.screen_name == "Server":
+                    with open('log.txt', 'w') as log:
+                        log.write("0: " + str(data) + "\n")
                 if data == "/quit": #quit sequence, the other party ended their session.
                     ch.close()
                     connection.close()
