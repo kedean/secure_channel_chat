@@ -97,7 +97,7 @@ class Channel:
             data = self.connection.recv(self.buffer_size)
             if data is not None and len(data) > 0:
                 if self._decrypt_cipher is not None:
-                    authenticator, data = data[0:64], data[64:]
+                    authenticator, data = data[0:64], data[64:] #the first half of any post-handshake message will be a 64-byte hex string of the authenticator, then the rest is the message
                     reauthentication_hasher = HMAC.new(self._auth_recv_hmac, digestmod=SHA256.new())
                     reauthentication_hasher.update(data)
                     reauthentication_hasher.update(str(self._num_msg_recv))

@@ -52,6 +52,7 @@ if __name__ == '__main__':
             print(result)
             exit(-3)
         elif result_code == 0: #remote connection was made, we are a client!
+            connection.doHandshakes()
             now = datetime.now()
             ch.pushMessage("Chat began on {0:02d}-{1:02d}-{2:02d} at {3:02d}:{4:02d}".format(now.year, now.month, now.day,  now.hour, now.minute))
         
