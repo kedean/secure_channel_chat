@@ -6,7 +6,8 @@ from Crypto.Cipher import PKCS1_OAEP
 from Crypto.Random import random
 from Crypto.Cipher import AES
 from Crypto.Util import Counter
-import pickle
+
+import base64
 
 import numpy
 
@@ -42,12 +43,15 @@ class Channel:
             self.connection.close()
             self.connection = None
     
+    def sendCodedMessage(self, message, code):
+        coded_message = "{0:04d}{1}".format(code, message) #provides 4 digits of option
+        self.sendMessage(coded_message)
     def sendMessage(self, message):
         if self.connection is None:
             return ("No connection.", -2)
         try:
             if self._encrypt_cipher is not None:
-                message = pickle.dumps(self._encrypt_cipher.encrypt(message))
+                message = base64.b64encode(self._encrypt_cipher.encrypt(message))
                 
             self.connection.send(message)
             return ("Success.", 0)
@@ -61,12 +65,20 @@ class Channel:
             data = self.connection.recv(self.buffer_size)
             if data:
                 if self._decrypt_cipher is not None:
-                    data = self._decrypt_cipher.decrypt(pickle.loads(data))
+                    data = self._decrypt_cipher.decrypt(base64.b64decode(data))
                 return (data, 0)
             else:
                 return ("No connection.", -1)
         except Exception:
             return ("No data recieved.", -2)
+    def receiveCodedMessage(self, message):
+        msg, error = self.receiveMessage()
+        if error == 0:
+            code = int(msg[0:4])
+            msg = msg[4:]
+            return ((msg, code), error)
+        else:
+            return (msg, error)
     
     def _int_to_bytes(self, val, num_bytes):
         return bytearray([(val & (0xff << pos*8)) >> pos*8 for pos in range(num_bytes)])
@@ -88,7 +100,7 @@ class Channel:
         exp1 = random.getrandbits(256)
         
         msg_crypt = self._rsa_othercipher.encrypt(str(exp1))
-        self.sendMessage(pickle.dumps(msg_crypt))
+        self.sendMessage(base64.b64encode(msg_crypt))
         
         exp2 = None
         while exp2 is None:
@@ -97,7 +109,7 @@ class Channel:
             if error == -1:
                 return -1
             elif error == 0: #response
-                msg = pickle.loads(result)
+                msg = base64.b64decode(result)
                 try:
                     exp2 = long(self._rsa_cipher.decrypt(msg))
                 except Exception as e:
@@ -127,7 +139,7 @@ class Channel:
             if error == -1:
                 return -1
             elif error == 0: #response
-                msg = pickle.loads(result)
+                msg = base64.b64decode(result)
                 try:
                     exp1 = long(self._rsa_cipher.decrypt(msg))
                 except Exception as e:
@@ -135,7 +147,7 @@ class Channel:
         
         exp2 = random.getrandbits(256)
         msg_crypt = self._rsa_othercipher.encrypt(str(exp2))
-        self.sendMessage(pickle.dumps(msg_crypt))
+        self.sendMessage(base64.b64encode(msg_crypt))
         
         self._shared_key = buffer(self._int_to_bytes(exp1 ^ exp2, 256 / 8))
         
