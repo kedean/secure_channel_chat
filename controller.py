@@ -23,26 +23,29 @@ class SecureChatController:
     
     def __init__(self, port, initial_screen_name=None, initial_connect_address=None, do_logging=False):
         self._chat_handler = chat.Chat(log=do_logging)
+        self._chat_handler.init()
         self._chat_handler.pushMessage("Listening for connections...")
         
         self._connection = None
         self._port = port
         
         if initial_connect_address is not None:
-            self._chat_handler.pushMessage("Attempting connection to {0}".format(initial_connect_address))
+            self._chat_handler.pushMessage("Attempting connection to {0}".format(initial_connect_address), refresh=True)
             
             self._connection = channel.Client(initial_connect_address, port)
             result, result_code = self._connection.connect() #this one isn't non-blocking, gotta wait!
             if result_code == -3: #connection refusal occurred
-                self.cleanup()
-                print(result)
-                exit(-3)
+                self._connection.close()
+                self._connection = channel.Listener(self._port)
+                self._listener = self._connection.listen()
+                self._chat_handler.pushMessage("The connection was refused!")
+                self._chat_handler.pushMessage("Listening for connections...", refresh=True)
             elif result_code == 0: #remote connection was made, we are a client!
+                self._chat_handler.pushMessage("Performing handshakes", refresh=True)
                 self._connection.doHandshakes()
                 now = datetime.now()
-                self._chat_handler.pushMessage("Chat began on {0:02d}-{1:02d}-{2:02d} at {3:02d}:{4:02d}".format(now.year, now.month, now.day,  now.hour, now.minute))
-            
-            self._chat_handler.setName(initial_screen_name if initial_screen_name is not None else "Client")
+                self._chat_handler.pushMessage("Chat began on {0:02d}-{1:02d}-{2:02d} at {3:02d}:{4:02d}".format(now.year, now.month, now.day,  now.hour, now.minute), refresh=True)
+                self._chat_handler.setName(initial_screen_name if initial_screen_name is not None else "Client")
         else:
             self._connection = channel.Listener(port)
             self._listener = self._connection.listen()
@@ -53,6 +56,7 @@ class SecureChatController:
     
     def __del__(self):
         self.cleanup()
+    
     def renderLoop(self):
         msg, code = self._chat_loop.next()
         
