@@ -31,5 +31,9 @@ if __name__ == '__main__':
             
     
     control = controller.SecureChatController(port, initial_screen_name, initial_connect_address, do_logging)
-    while control.renderLoop():
+    success, return_val = True, None
+    while success:
+        success, return_val = control.renderLoop()
         time.sleep(0.01)
+        
+    print return_val

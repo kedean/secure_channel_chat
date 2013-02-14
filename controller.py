@@ -67,9 +67,6 @@ class SecureChatController:
                 self._ch.pushMessage("Chat began on {0:02d}-{1:02d}-{2:02d} at {3:02d}:{4:02d}".format(now.year, now.month, now.day,  now.hour, now.minute), refresh=True)
         
         if code == -2: #-2 indicates the user typed the 'quit' command sequence, send an indication to the other party and exit
-            self._ch.close()
-            print("\nTerminating self._connection.")
-            
             result, error = self._connection.sendMessage("/quit")
             
             if self._connection.connection_type == "server": #we need a response indicating the other party has quit already, or the next session may fail
@@ -81,8 +78,8 @@ class SecureChatController:
                         break
             else:
                 self._connection.sendMessage("/quit") #any message will work, so pick something simple here, just need to indicate we're closing down too
-            self._connection.close()
-            exit(0)
+            self.cleanup()
+            return (False, "Session ended.")
         elif code == 2:
             remote_address = msg
             
@@ -111,10 +108,8 @@ class SecureChatController:
             result, error = self._connection.sendMessage("The other party is now known as {0}".format(msg))
             
             if error == -1: #problem!
-                self._ch.close()
-                self._connection.close()
-                print("\nConnection was lost!")
-                exit(-1)
+                self.cleanup()
+                return (False, "Connection was lost!")
             else: #success!
                 pass
         elif code == 0: #0 indicates a full messages is typed and ready to send
@@ -124,10 +119,8 @@ class SecureChatController:
             result, error = self._connection.sendMessage(msg)
             
             if error == -1: #problem!
-                self._ch.close()
-                self._connection.close()
-                print("\nConnection was lost!")
-                exit(-1)
+                self.cleanup()
+                return (False, "Connection was lost!")
             elif error == 0 : #success!
                 self._ch.pushMessage(msg)
         
@@ -135,25 +128,18 @@ class SecureChatController:
             #in either case we need to handle a possible receival
             result, error = self._connection.receiveMessage()
             if error == -1:
-                self._ch.close()
-                self._connection.close()
-                print("\nConnection was terminated by other party.")
-                exit(-2)
+                self.cleanup()
+                return (False, "\nConnection was terminated by other party.")
             elif error == -4: #bad authentication
-                self._ch.close()
-                self._connection.close()
-                print("\nMessage contained a bad authenticator, a message was lost in transit or someone is modifying your communications.")
-                print("Halting.")
-                exit(-2)
+                self.cleanup()
+                return (False, "Message contained a bad authenticator, a message was lost in transit or someone is modifying your communications, halting.")
             elif error == 0: #got a real message!
                 #using the previous definition, unpack the message received
                 data = result
                 if data == "/quit": #quit sequence, the other party ended their session.
-                    self._ch.close()
-                    self._connection.close()
-                    print("\nConnection was terminated by other party.")
-                    exit(0)
+                    self.cleanup()
+                    return (False, "Connection was terminated by the other party.")
                 else:
                     self._ch.pushMessage(data, refresh=True)
             #a -2 error code means nothing has occured, so we'll go ahead and keep moving
-        return True
+        return (True, None)
