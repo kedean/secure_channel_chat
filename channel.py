@@ -43,20 +43,42 @@ class Channel:
             self.connection.close()
             self.connection = None
     
-    def sendCodedMessage(self, message, code):
-        coded_message = "{0:04d}{1}".format(code, message) #provides 4 digits of option
-        self.sendMessage(coded_message)
     def sendMessage(self, message):
         if self.connection is None:
             return ("No connection.", -2)
+        
+        if not isinstance(message, str): #regular strings should go straight to the encoding/transfer process
+            try:
+                message_list = list(message) #cast, if this fails it was a bad argument
+            except:
+                return ("Message must be either a string or an iterable of strings.")
+            else:
+                """
+                the hex byte \x02, or the ascii 'start of text', is used for concatenating message components, so it cannot occur in any
+                of the components. It is assumed it does not, but is stripped out in case. The protocol may mess up message that contain this
+                byte for some reason.
+                
+                the caveat in message reception does not concern this portion, as key transfer will never involve iterables
+                """
+                message_list = [item.strip("\x02") for item in message_list]
+                message = "\x02".join(message_list)
+                
+        
+        with open("log.txt", "a") as log:
+            log.write("d\n")
+        
         try:
             if self._encrypt_cipher is not None:
                 message = base64.b64encode(self._encrypt_cipher.encrypt(message))
-                
-            self.connection.send(message)
-            return ("Success.", 0)
-        except Exception:
-            return ("An exception occurred in transport.", -1)
+        except:
+            return ("An exception occurred in encryption.", -3)
+        else:
+            try:
+                self.connection.send(message)
+            except Exception:
+                return ("An exception occurred in transport.", -1)
+            else:
+                return ("Success.", 0)
         
     def receiveMessage(self):
         if self.connection is None or self.connection_type is None:
@@ -65,25 +87,24 @@ class Channel:
             data = self.connection.recv(self.buffer_size)
             if data:
                 if self._decrypt_cipher is not None:
+                    
                     data = self._decrypt_cipher.decrypt(base64.b64decode(data))
+                    
+                    if "\x02" in data: #the data was a list of message components, reconstruct the list as the return value
+                        #note that this should only happen during chat transport, when the decryption cipher is valid
+                        #\x02 bytes could appear during key exchange as well, which we do not want to alter, so this transform
+                        #only occurs when the encryption system is fully functioning and set up
+                        data = data.split("\x02")
                 return (data, 0)
             else:
                 return ("No connection.", -1)
         except Exception:
             return ("No data recieved.", -2)
-    def receiveCodedMessage(self, message):
-        msg, error = self.receiveMessage()
-        if error == 0:
-            code = int(msg[0:4])
-            msg = msg[4:]
-            return ((msg, code), error)
-        else:
-            return (msg, error)
     
     def _int_to_bytes(self, val, num_bytes):
         return bytearray([(val & (0xff << pos*8)) >> pos*8 for pos in range(num_bytes)])
     
-    def startHandshake(self):
+    def _startHandshake(self):
         self._rsa_key = RSA.generate(self._rsa_keylength)
         self._rsa_cipher = PKCS1_OAEP.new(self._rsa_key)
         pem = self._rsa_key.exportKey()
@@ -118,7 +139,7 @@ class Channel:
         self._shared_key = buffer(self._int_to_bytes(exp1 ^ exp2, 256 / 8))
         
     
-    def acceptHandshake(self):
+    def _acceptHandshake(self):
         while self._rsa_other_pubkey is None:
             result, error = self.receiveMessage()
             
@@ -151,11 +172,18 @@ class Channel:
         
         self._shared_key = buffer(self._int_to_bytes(exp1 ^ exp2, 256 / 8))
         
-    def initializeSecureChannel(self):
+    def _initSecureChannel(self):
         ctr = Counter.new(128)
         self._encrypt_cipher = AES.new(self._shared_key, AES.MODE_CTR, counter=ctr)
         self._decrypt_cipher = AES.new(self._shared_key, AES.MODE_CTR, counter=ctr)
+    
+    def doHandshakes(self):
+        if self.connection_type == "server":
+            self._startHandshake()
+        else:
+            self._acceptHandshake()
         
+        self._initSecureChannel()
 
 class Listener(Channel):
     
@@ -177,9 +205,6 @@ class Listener(Channel):
                 self.connection.setblocking(0)
                 self.connection_type = "server"
                 
-                self.startHandshake()
-                self.initializeSecureChannel()
-                
                 yield ("Success.", 0)
             except socket.error:
                 yield ("Address is already in use or port is unusable.", -3) #make more informative
@@ -198,11 +223,6 @@ class Client(Channel):
             self.connection.setblocking(0)
             self.connection_type = "client"
             
-            self.acceptHandshake()
-            self.initializeSecureChannel()
-            
             return ("Success.", 0)
         except socket.error:
             return ("The connection was refused or failed!", -3) #make more informative
-    
-    

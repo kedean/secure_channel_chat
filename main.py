@@ -1,7 +1,6 @@
 import channel
 import sys
 import chat
-import pickle
 from datetime import datetime
 import time
 
@@ -34,7 +33,7 @@ if __name__ == '__main__':
     
     #create but DO NOT YET initialize the chat window, this way error and results can still be posted first
     ch = chat.Chat(log=True)
-    ch.addMessage("Listening for connections...")
+    ch.pushMessage("Listening for connections...")
     
     #connection = None
     
@@ -42,7 +41,7 @@ if __name__ == '__main__':
     
     connection = None
     if initial_connect_address is not None:
-        ch.addMessage("Attempting connection to {0}".format(initial_connect_address))
+        ch.pushMessage("Attempting connection to {0}".format(initial_connect_address))
         
         connection = channel.Client(initial_connect_address, port)
         result, result_code = connection.connect() #this one isn't non-blocking, gotta wait!
@@ -53,7 +52,7 @@ if __name__ == '__main__':
             exit(-3)
         elif result_code == 0: #remote connection was made, we are a client!
             now = datetime.now()
-            ch.addMessage("Chat began on {0:02d}-{1:02d}-{2:02d} at {3:02d}:{4:02d}".format(now.year, now.month, now.day,  now.hour, now.minute))
+            ch.pushMessage("Chat began on {0:02d}-{1:02d}-{2:02d} at {3:02d}:{4:02d}".format(now.year, now.month, now.day,  now.hour, now.minute))
         
         ch.setName(initial_screen_name if initial_screen_name is not None else "Client")
     else:
@@ -71,16 +70,16 @@ if __name__ == '__main__':
             
             if result_code == 0: #remote connection was made, we are a server!
                 now = datetime.now()
-                ch.addMessage("Received connection from {0}".format(connection.client_address[0]))
-                ch.addMessage("Chat began on {0:02d}-{1:02d}-{2:02d} at {3:02d}:{4:02d}".format(now.year, now.month, now.day,  now.hour, now.minute))
-                ch.refreshQueue()
+                ch.pushMessage("Received connection from {0}".format(connection.client_address[0]))
+                ch.pushMessage("Performing handshakes...", refresh=True)
+                connection.doHandshakes()
+                ch.pushMessage("Chat began on {0:02d}-{1:02d}-{2:02d} at {3:02d}:{4:02d}".format(now.year, now.month, now.day,  now.hour, now.minute), refresh=True)
         
         if code == -2: #-2 indicates the user typed the 'quit' command sequence, send an indication to the other party and exit
             ch.close()
             print("\nTerminating connection.")
             
-            text_to_send = pickle.dumps("/quit")
-            result, error = connection.sendMessage(text_to_send)
+            result, error = connection.sendMessage("/quit")
             
             if connection.connection_type == "server": #we need a response indicating the other party has quit already, or the next session may fail
                 timeout = time.time() + 5000 #maybe make variable?
@@ -95,9 +94,11 @@ if __name__ == '__main__':
             exit(0)
         elif code == 2:
             remote_address = msg
+            
+            ch.pushMessage("Attempting connection to {0}".format(remote_address), refresh=True)
+            
             connection.close() #we need to kill the server processing, we're now a client
-            ch.addMessage("Attempting connection to {0}".format(remote_address))
-            ch.refreshQueue()
+            
             connection = channel.Client(remote_address, port)
             result, result_code = connection.connect() #this one isn't non-blocking, gotta wait!
             if result_code == -3: #connection refusal occurred
@@ -106,13 +107,16 @@ if __name__ == '__main__':
                 print(result)
                 exit(-3)
             elif result_code == 0: #remote connection was made, we are a client!
+                ch.pushMessage("{0}...Connection established".format(ch.popMessage()))
+                ch.pushMessage("Performing handshakes", refresh=True)
+                connection.doHandshakes()
+                
                 if ch.screen_name == "Server":
                     ch.setName("Client")
                 now = datetime.now()
-                ch.addMessage("Chat began on {0:02d}-{1:02d}-{2:02d} at {3:02d}:{4:02d}".format(now.year, now.month, now.day,  now.hour, now.minute))
-                ch.refreshQueue()
+                ch.pushMessage("Chat began on {0:02d}-{1:02d}-{2:02d} at {3:02d}:{4:02d}".format(now.year, now.month, now.day,  now.hour, now.minute), refresh=True)
         elif code == 1: #new screen name
-            result, error = connection.sendMessage(pickle.dumps("The other party is now known as {0}".format(msg)))
+            result, error = connection.sendMessage("The other party is now known as {0}".format(msg))
             
             if error == -1: #problem!
                 ch.close()
@@ -122,9 +126,10 @@ if __name__ == '__main__':
             else: #success!
                 pass
         elif code == 0: #0 indicates a full messages is typed and ready to send
-            #the messages sent are a pickled tuple of (my_screen_name, text), later this should be encrypted
-            text_to_send = pickle.dumps(msg)
-            result, error = connection.sendMessage(text_to_send)
+            #the messages sent are a tuple of (my_screen_name, time, text)
+            #they are serialized internally
+            
+            result, error = connection.sendMessage(msg)
             
             if error == -1: #problem!
                 ch.close()
@@ -132,7 +137,7 @@ if __name__ == '__main__':
                 print("\nConnection was lost!")
                 exit(-1)
             elif error == 0 : #success!
-                ch.addMessage(msg)
+                ch.pushMessage(msg)
         
         if connection.connection_type is not None:
             #in either case we need to handle a possible receival
@@ -144,7 +149,7 @@ if __name__ == '__main__':
                 exit(-2)
             elif error == 0: #got a real message!
                 #using the previous definition, unpack the message received
-                data = pickle.loads(result)
+                data = result
                 
                 if data == "/quit": #quit sequence, the other party ended their session.
                     ch.close()
@@ -152,8 +157,7 @@ if __name__ == '__main__':
                     print("\nConnection was terminated by other party.")
                     exit(0)
                 else:
-                    ch.addMessage(data)
-                    ch.refreshQueue()
+                    ch.pushMessage(data, refresh=True)
             #a -2 error code means nothing has occured, so we'll go ahead and keep moving
         
         time.sleep(0.01)

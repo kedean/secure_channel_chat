@@ -53,34 +53,33 @@ class Chat:
             try:
                 plaintext = subqueue[y]
                 if not isinstance(subqueue[y], str): #for messages where the queue item is a string, just display that (like system notices), otherwise parse like usual
-                    #need better error checking
-                    timestamp = " on {0:02d}-{1:02d}-{2:02d} at {3:02d}:{4:02d}".format(subqueue[y][1].year,
-                                                                    subqueue[y][1].month,
-                                                                    subqueue[y][1].day,
-                                                                    subqueue[y][1].hour,
-                                                                    subqueue[y][1].minute
-                                                                    )
-                    plaintext = subqueue[y][0] + timestamp + ": " + subqueue[y][2] #currently items are tuples of (screen_name, msg)
+                    plaintext = subqueue[y][0] + " on " + subqueue[y][1] + ": " + subqueue[y][2] #currently items are tuples of (screen_name, msg)
                 self.stdscr.addstr(y, 0, plaintext)
             except IndexError:
                 pass
-    
-    def addMessage(self, msg):
-        self.message_queue.append(msg)
-        if self._log_file is not None:
-            for msg in self.message_queue:
-                plaintext = msg
-                if not isinstance(msg, str): #for messages where the queue item is a string, just display that (like system notices), otherwise parse like usual
-                    timestamp = " on {0:02d}-{1:02d}-{2:02d} at {3:02d}:{4:02d}".format(
-                        msg[1].year,
-                        msg[1].month,
-                        msg[1].day,
-                        msg[1].hour,
-                        msg[1].minute
-                        )
-                    plaintext = msg[0] + timestamp + ": " + msg[2]
-                self._log_file.write(plaintext + "\n")
         
+        self.stdscr.refresh()
+    
+    def pushMessage(self, msg, refresh=False):
+        if isinstance(msg, str) or ((isinstance(msg, tuple) or isinstance(msg, list)) and len(msg) == 3 and isinstance(msg[0], str) and isinstance(msg[1], str) and isinstance(msg[2], str)):
+            self.message_queue.append(msg)
+            if self._log_file is not None:
+                for msg in self.message_queue:
+                    plaintext = msg
+                    if not isinstance(msg, str): #for messages where the queue item is a string, just display that (like system notices), otherwise parse like usual
+                        plaintext = msg[0] + " on " + msg[1] + ": " + msg[2]
+                    self._log_file.write(plaintext + "\n")
+        else:
+            raise TypeError("Chat messages must be either a string or a 3-tuple of strings (in format (username, timestamp, text)).")
+        
+        if refresh:
+            self.refreshQueue()
+        
+    def popMessage(self, refresh=False):
+        item = self.message_queue.pop(-1)
+        if refresh:
+            self.refreshQueue()
+        return item
     
     def render(self):
         if not self._has_rendered:
@@ -136,13 +135,20 @@ class Chat:
                     yield ("quitting", -2)
                 elif out_msg[0:len("/name ")] == "/name ":
                     self.setName(out_msg[len("/name "):])
-                    self.addMessage("You are now known as '{0}'".format(self.screen_name))
+                    self.pushMessage("You are now known as '{0}'".format(self.screen_name))
                     #add a 'getLastMesage' so that the parent code can extract the last message on a certain return code and send it to the other party, such as this message (though modified)
                     yield (self.screen_name, 1)
                 elif out_msg[0:len("/connect ")] == "/connect ":
                     yield (out_msg[len("/connect "):], 2)
             else:
-                out_tuple = (self.screen_name, datetime.now(), out_msg)
+                now = datetime.now()
+                timestamp = "{0:02d}-{1:02d}-{2:02d} at {3:02d}:{4:02d}".format(now.year,
+                                                                                    now.month,
+                                                                                    now.day,
+                                                                                    now.hour,
+                                                                                    now.minute
+                                                                                    )
+                out_tuple = (self.screen_name, timestamp, out_msg)
                 yield (out_tuple, 0)
         
         return
