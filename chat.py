@@ -4,8 +4,8 @@ import os
 from datetime import datetime
 
 class Chat:
-    _has_rendered = False
-    _log_file = None
+    __has_rendered = False
+    __log_file = None
     
     def __init__(self, screen_name="_", init=False, log=False):
         self.message_queue = []
@@ -15,20 +15,20 @@ class Chat:
                 os.mkdir("logs/")
             filename = "logs/log_{0}.txt".format(datetime.now())
             log_file = open(filename, "w")
-            self._log_file = log_file
+            self.__log_file = log_file
         if init:
             self.init()
         
     def __del__(self):
         self.close()
     def close(self):
-        if self._log_file is not None:
-            self._log_file.close()
-            self._log_file = None
-        if self._has_rendered:
+        if self.__log_file is not None:
+            self.__log_file.close()
+            self.__log_file = None
+        if self.__has_rendered:
             curses.endwin()
             #os.system("clear")
-            self._has_rendered = False
+            self.__has_rendered = False
             
     
     def init(self):
@@ -37,7 +37,7 @@ class Chat:
         self.stdscr.keypad(1)
         self.stdscr.leaveok(0)
         self.stdscr.nodelay(1)
-        self._has_rendered = True
+        self.__has_rendered = True
         
     def setName(self, name):
         self.screen_name = name
@@ -63,12 +63,12 @@ class Chat:
     def pushMessage(self, msg, refresh=False):
         if isinstance(msg, str) or ((isinstance(msg, tuple) or isinstance(msg, list)) and len(msg) == 3 and isinstance(msg[0], str) and isinstance(msg[1], str) and isinstance(msg[2], str)):
             self.message_queue.append(msg)
-            if self._log_file is not None:
+            if self.__log_file is not None:
                 for msg in self.message_queue:
                     plaintext = msg
                     if not isinstance(msg, str): #for messages where the queue item is a string, just display that (like system notices), otherwise parse like usual
                         plaintext = msg[0] + " on " + msg[1] + ": " + msg[2]
-                    self._log_file.write(plaintext + "\n")
+                    self.__log_file.write(plaintext + "\n")
         else:
             raise TypeError("Chat messages must be either a string or a 3-tuple of strings (in format (username, timestamp, text)).")
         
@@ -82,7 +82,7 @@ class Chat:
         return item
     
     def render(self):
-        if not self._has_rendered:
+        if not self.__has_rendered:
             self.init()
         
         while True:

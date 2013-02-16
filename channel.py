@@ -21,18 +21,18 @@ class Channel:
     buffer_size = 4096
     connection_type = None
     
-    _rsa_key = None
-    _rsa_keylength = 2048
-    _rsa_other_pubkey = None
-    _rsa_cipher = None
-    _rsa_othercipher = None
+    ___rsa_key = None
+    __rsa_keylength = 2048
+    __rsa_other_pubkey = None
+    __rsa_cipher = None
+    __rsa_othercipher = None
     
-    _shared_key = None
-    _encrypt_cipher = None
-    _decrypt_cipher = None
+    __shared_key = None
+    __encrypt_cipher = None
+    __decrypt_cipher = None
     
-    _num_msg_sent = 0
-    _num_msg_recv = 0
+    __num_msg_sent = 0
+    __num_msg_recv = 0
     
     def __init__(self, address, port):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -70,16 +70,16 @@ class Channel:
                 
         
         try:
-            if self._encrypt_cipher is not None:
-                message = base64.b64encode(self._encrypt_cipher.encrypt(message))
+            if self.__encrypt_cipher is not None:
+                message = base64.b64encode(self.__encrypt_cipher.encrypt(message))
                 
-                authenticator_hasher = HMAC.new(self._auth_send_hmac, digestmod=SHA256.new())
+                authenticator_hasher = HMAC.new(self.__auth_send_hmac, digestmod=SHA256.new())
                 authenticator_hasher.update(message)
-                authenticator_hasher.update(str(self._num_msg_sent))
+                authenticator_hasher.update(str(self.__num_msg_sent))
                 authenticator = authenticator_hasher.hexdigest()
                 
                 message = "{0}{1}".format(authenticator, message)
-                self._num_msg_sent += 1
+                self.__num_msg_sent += 1
         except:
             return ("An exception occurred in encryption.", -3)
         else:
@@ -96,19 +96,19 @@ class Channel:
         try:
             data = self.connection.recv(self.buffer_size)
             if data is not None and len(data) > 0:
-                if self._decrypt_cipher is not None:
+                if self.__decrypt_cipher is not None:
                     authenticator, data = data[0:64], data[64:] #the first half of any post-handshake message will be a 64-byte hex string of the authenticator, then the rest is the message
-                    reauthentication_hasher = HMAC.new(self._auth_recv_hmac, digestmod=SHA256.new())
+                    reauthentication_hasher = HMAC.new(self.__auth_recv_hmac, digestmod=SHA256.new())
                     reauthentication_hasher.update(data)
-                    reauthentication_hasher.update(str(self._num_msg_recv))
+                    reauthentication_hasher.update(str(self.__num_msg_recv))
                     reauthenticator = reauthentication_hasher.hexdigest()
                     
                     if reauthenticator != authenticator:
                         return ("Authentication of message failed.", -4)
                     
-                    self._num_msg_recv += 1
+                    self.__num_msg_recv += 1
                     
-                    data = self._decrypt_cipher.decrypt(base64.b64decode(data))
+                    data = self.__decrypt_cipher.decrypt(base64.b64decode(data))
                     
                     if "\x02" in data: #the data was a list of message components, reconstruct the list as the return value
                         #note that this should only happen during chat transport, when the decryption cipher is valid
@@ -121,26 +121,26 @@ class Channel:
         except Exception:
             return ("No data recieved.", -2)
     
-    def _int_to_bytes(self, val, num_bytes):
+    def __intToBytes(self, val, num_bytes):
         return bytearray([(val & (0xff << pos*8)) >> pos*8 for pos in range(num_bytes)])
     
-    def _startHandshake(self):
-        self._rsa_key = RSA.generate(self._rsa_keylength)
-        self._rsa_cipher = PKCS1_OAEP.new(self._rsa_key)
-        pem = self._rsa_key.exportKey()
+    def __startHandshake(self):
+        self.__rsa_key = RSA.generate(self.__rsa_keylength)
+        self.__rsa_cipher = PKCS1_OAEP.new(self.__rsa_key)
+        pem = self.__rsa_key.exportKey()
         self.sendMessage(pem)
-        while self._rsa_other_pubkey is None:
+        while self.__rsa_other_pubkey is None:
             result, error = self.receiveMessage()
             
             if error == -1:
                 return -1
             elif error == 0: #response
-                self._rsa_other_pubkey = RSA.importKey(result)
-                self._rsa_othercipher = PKCS1_OAEP.new(self._rsa_other_pubkey)
+                self.__rsa_other_pubkey = RSA.importKey(result)
+                self.__rsa_othercipher = PKCS1_OAEP.new(self.__rsa_other_pubkey)
         
         exp1 = random.getrandbits(256)
         
-        msg_crypt = self._rsa_othercipher.encrypt(str(exp1))
+        msg_crypt = self.__rsa_othercipher.encrypt(str(exp1))
         self.sendMessage(base64.b64encode(msg_crypt))
         
         exp2 = None
@@ -152,26 +152,26 @@ class Channel:
             elif error == 0: #response
                 msg = base64.b64decode(result)
                 try:
-                    exp2 = long(self._rsa_cipher.decrypt(msg))
+                    exp2 = long(self.__rsa_cipher.decrypt(msg))
                 except Exception as e:
                     exit()
         
-        self._shared_key = buffer(self._int_to_bytes(exp1 ^ exp2, 256 / 8))
+        self.__shared_key = buffer(self.__intToBytes(exp1 ^ exp2, 256 / 8))
         
     
-    def _acceptHandshake(self):
-        while self._rsa_other_pubkey is None:
+    def __acceptHandshake(self):
+        while self.__rsa_other_pubkey is None:
             result, error = self.receiveMessage()
             
             if error == -1:
                 return -1
             elif error == 0: #response
-                self._rsa_other_pubkey = RSA.importKey(result)
-                self._rsa_othercipher = PKCS1_OAEP.new(self._rsa_other_pubkey)
+                self.__rsa_other_pubkey = RSA.importKey(result)
+                self.__rsa_othercipher = PKCS1_OAEP.new(self.__rsa_other_pubkey)
         
-        self._rsa_key = RSA.generate(self._rsa_keylength)
-        self._rsa_cipher = PKCS1_OAEP.new(self._rsa_key)
-        self.sendMessage(self._rsa_key.exportKey())
+        self.__rsa_key = RSA.generate(self.__rsa_keylength)
+        self.__rsa_cipher = PKCS1_OAEP.new(self.__rsa_key)
+        self.sendMessage(self.__rsa_key.exportKey())
         
         exp1 = None
         while exp1 is None:
@@ -182,55 +182,40 @@ class Channel:
             elif error == 0: #response
                 msg = base64.b64decode(result)
                 try:
-                    exp1 = long(self._rsa_cipher.decrypt(msg))
+                    exp1 = long(self.__rsa_cipher.decrypt(msg))
                 except Exception as e:
                     exit("could not decrypt")
         
         exp2 = random.getrandbits(256)
-        msg_crypt = self._rsa_othercipher.encrypt(str(exp2))
+        msg_crypt = self.__rsa_othercipher.encrypt(str(exp2))
         self.sendMessage(base64.b64encode(msg_crypt))
         
-        self._shared_key = (self._int_to_bytes(exp1 ^ exp2, 256 / 8))
+        self.__shared_key = buffer(self.__intToBytes(exp1 ^ exp2, 256 / 8))
         
-    def _initSecureChannel(self):
-        hasher = SHA256.new()
-        hasher.update(self._shared_key)
-        hasher.update("client sends to server")
-        enc_send_key = hasher.digest()
+    def __initSecureChannel(self):
         
-        hasher = SHA256.new()
-        hasher.update(self._shared_key)
-        hasher.update("server sends to client")
-        enc_recv_key = hasher.digest()
+        """
+        keys are generated for the four possible encryption/decryption situations
+        if the user is a server (conn_type != client), then they are ordered slightly differently
+        """
+        enc_send_key, enc_recv_key, self.__auth_send_hmac, self.__auth_recv_hmac = [
+            SHA256.new(str(self.__shared_key) + uniq_text).digest()
+            for uniq_text in (["a send b", "b send a", "a auth b", "b auth a"] if self.connection_type == "client" else ["b send a", "a send b", "b auth a", "a auth b"])
+        ]
         
-        hasher = SHA256.new()
-        hasher.update(self._shared_key)
-        hasher.update("client auths to server")
-        auth_send_key = hasher.digest()
+        #in the case of send/recv encryption, we only need one cipher, rather than making a new one each time.
+        self.__encrypt_cipher = AES.new(enc_send_key, AES.MODE_CTR, counter=Counter.new(128))
+        self.__decrypt_cipher = AES.new(enc_recv_key, AES.MODE_CTR, counter=Counter.new(128))
         
-        hasher = SHA256.new()
-        hasher.update(self._shared_key)
-        hasher.update("server auths to client")
-        auth_recv_key = hasher.digest()
-        
-        if self.connection_type == "server": #swap dem
-            enc_send_key, enc_recv_key = enc_recv_key, enc_send_key
-            auth_send_key, auth_recv_key = auth_recv_key, auth_send_key
-        
-        self._encrypt_cipher = AES.new(enc_send_key, AES.MODE_CTR, counter=Counter.new(128))
-        self._decrypt_cipher = AES.new(enc_recv_key, AES.MODE_CTR, counter=Counter.new(128))
-        
-        self._auth_send_hmac = auth_send_key
-        self._auth_recv_hmac = auth_recv_key
         
     
     def doHandshakes(self):
         if self.connection_type == "server":
-            self._startHandshake()
+            self.__startHandshake()
         else:
-            self._acceptHandshake()
+            self.__acceptHandshake()
         
-        self._initSecureChannel()
+        self.__initSecureChannel()
 
 class Listener(Channel):
     
