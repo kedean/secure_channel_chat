@@ -141,16 +141,22 @@ class Chat:
                 elif out_msg[0:len("/connect ")] == "/connect ":
                     yield (out_msg[len("/connect "):], 2)
             else:
-                now = datetime.now()
-                timestamp = "{0:02d}-{1:02d}-{2:02d} at {3:02d}:{4:02d}".format(now.year,
-                                                                                    now.month,
-                                                                                    now.day,
-                                                                                    now.hour,
-                                                                                    now.minute
-                                                                                    )
-                out_tuple = (self.screen_name, timestamp, out_msg)
+                out_tuple = (self.screen_name, self.dateString(), out_msg)
                 yield (out_tuple, 0)
         
         return
     def shouldRefresh(self):
         return True
+    @staticmethod
+    def dateString(d=None):
+        if not isinstance(d, datetime):
+            d = datetime.now()
+        
+        timestamp = "{0:02d}-{1:02d}-{2:02d} at {3:02d}:{4:02d}".format(d.year,
+                                                                        d.month,
+                                                                        d.day,
+                                                                        d.hour,
+                                                                        d.minute
+                                                                        )
+        return timestamp
+    

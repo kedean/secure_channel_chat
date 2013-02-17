@@ -43,8 +43,7 @@ class SecureChatController:
             elif result_code == 0: #remote connection was made, we are a client!
                 self.__chat_handler.pushMessage("Performing handshakes", refresh=True)
                 self.__connection.doHandshakes()
-                now = datetime.now()
-                self.__chat_handler.pushMessage("Chat began on {0:02d}-{1:02d}-{2:02d} at {3:02d}:{4:02d}".format(now.year, now.month, now.day,  now.hour, now.minute), refresh=True)
+                self.__chat_handler.pushMessage("Chat began on {0}".format(chat.Chat.dateString()), refresh=True)
                 self.__chat_handler.setName(initial_screen_name if initial_screen_name is not None else "Client")
         else:
             self.__connection = channel.Listener(port)
@@ -67,11 +66,10 @@ class SecureChatController:
                 result, result_code = self.__listener.next()
                 
                 if result_code == 0: #remote self.__connection was made, we are a server!
-                    now = datetime.now()
                     self.__chat_handler.pushMessage("Received connection from {0}".format(self.__connection.client_address[0]))
                     self.__chat_handler.pushMessage("Performing handshakes", refresh=True)
                     self.__connection.doHandshakes()
-                    self.__chat_handler.pushMessage("Chat began on {0:02d}-{1:02d}-{2:02d} at {3:02d}:{4:02d}".format(now.year, now.month, now.day,  now.hour, now.minute), refresh=True)
+                    self.__chat_handler.pushMessage("Chat began on {0}".format(chat.Chat.dateString()), refresh=True)
             
             if code == -2: #-2 indicates the user typed the 'quit' command sequence, send an indication to the other party and exit
                 result, error = self.__connection.sendMessage("/quit")
@@ -110,8 +108,7 @@ class SecureChatController:
                     
                     if self.__chat_handler.screen_name == "Server":
                         self.__chat_handler.setName("Client")
-                    now = datetime.now()
-                    self.__chat_handler.pushMessage("Chat began on {0:02d}-{1:02d}-{2:02d} at {3:02d}:{4:02d}".format(now.year, now.month, now.day,  now.hour, now.minute), refresh=True)
+                    self.__chat_handler.pushMessage("Chat began on {0}".format(chat.Chat.dateString()), refresh=True)
             elif code == 1: #new screen name
                 result, error = self.__connection.sendMessage("The other party is now known as {0}".format(msg))
                 
