@@ -33,7 +33,6 @@ class SecureChatController:
         self.__chat_handler.init()
         self.__chat_handler.pushMessage("Listening for connections...")
         
-        self.__connection = None
         self.__port = port
         
         self.__connect_to_address = initial_connect_address
@@ -41,7 +40,10 @@ class SecureChatController:
         self.__connection = Listener(port)
         self.__listener = self.__connection.listen()
         
-        self.__chat_handler.setName(initial_screen_name if initial_screen_name is not None else "Server", suppressMessage=True)
+        if initial_screen_name is None:
+            self.__chat_handler.setName("_", suppressMessage=True)
+        else:
+            self.__chat_handler.setName(initial_screen_name, suppressMessage=True)
         
         self.__chat_loop = self.__chat_handler.render()
     
@@ -149,10 +151,13 @@ class SecureChatController:
         
         other_sn = None
         
-        if self.__connection.connection_type == "client":
-            if self.__chat_handler.screen_name == "Server":
+        if self.__chat_handler.screen_name == "_":
+            if self.__connection.connection_type == "client":
                 self.__chat_handler.setName("Client")
-            
+            else: #implied server
+                self.__chat_handler.setName("Server")
+        
+        if self.__connection.connection_type == "client":
             #the client initiates name exchange
             self.__connection.sendMessage(self.__chat_handler.screen_name)
             other_sn, error = self.__connection.receiveMessageBlocking()
