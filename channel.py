@@ -13,7 +13,7 @@ import base64
 
 import numpy
 
-class Channel(object):
+class SecureChannel(object):
     
     NO_CONNECTION = None
     SERVER, CLIENT = 1, 2
@@ -240,10 +240,10 @@ class Channel(object):
             self.CLIENT: 'client'
         }.get(self._role, None)
 
-class Listener(Channel):
+class Listener(SecureChannel):
     
     def __init__(self, port):
-        Channel.__init__(self, "", port)
+        SecureChannel.__init__(self, "", port)
     
     def listen(self):
         while self.connection_type is self.NO_CONNECTION:
@@ -269,10 +269,10 @@ class Listener(Channel):
     def listen_non_blocking(self):
         pass
     
-class Client(Channel):
+class Client(SecureChannel):
     
     def __init__(self, address, port):
-        Channel.__init__(self, address, port)
+        SecureChannel.__init__(self, address, port)
     
     def connect(self):
         try:

@@ -156,13 +156,25 @@ class Chat:
                 elif out_msg == Chat.MSG_STOP_LOGGING:
                     self.stopLogging()
                     yield ("stopped logging", 4)
+                elif out_msg == Chat.MSG_HELP:
+                    self.pushMessage("Available Commands:\nQuit: {0}\nChange Username: {1}new_name\nConnect to server: {2}server_name\nEnable logging: {3}\nDisable Logging: {4}".format(
+                        Chat.MSG_QUIT,
+                        Chat.MSG_NAME_CHANGE,
+                        Chat.MSG_CONNECT,
+                        Chat.MSG_START_LOGGING,
+                        Chat.MSG_STOP_LOGGING
+                        )
+                    )
+                    yield ("showed help", 5)
+                else:
+                    self.pushMessage("Command sequence {0} is unknown. Type {1} for a list of commands.".format(out_msg, Chat.MSG_HELP))
+                    yield ("unkown command", 6)
             else:
                 out_tuple = (self.screen_name, self.dateString(), out_msg)
                 yield (out_tuple, 0)
         
         return
-    def shouldRefresh(self):
-        return True
+    
     @staticmethod
     def dateString(d=None):
         if not isinstance(d, datetime):
@@ -181,3 +193,4 @@ class Chat:
     MSG_CONNECT = "/connect "
     MSG_START_LOGGING = "/enable logging"
     MSG_STOP_LOGGING = "/disable logging"
+    MSG_HELP = "/help"
