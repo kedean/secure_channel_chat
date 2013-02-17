@@ -39,6 +39,8 @@ class SecureChannel(object):
     __num_msg_sent = 0
     __num_msg_recv = 0
     
+    __standard_salt = "i am a message salt!"
+    
     def __init__(self, address, port):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.address, self.port = address, port
@@ -140,7 +142,8 @@ class SecureChannel(object):
     def __intToBytes(self, val, num_bytes):
         return bytearray([(val & (0xff << pos*8)) >> pos*8 for pos in range(num_bytes)])
     
-    def __startHandshake(self):
+    def __startHandshake(self, passphrase):
+        """
         self.__rsa_key = RSA.generate(self.__rsa_keylength)
         self.__rsa_cipher = PKCS1_OAEP.new(self.__rsa_key)
         pem = self.__rsa_key.exportKey()
@@ -170,9 +173,33 @@ class SecureChannel(object):
         
         self.__shared_key = buffer(self.__intToBytes(exp1 ^ exp2, 256 / 8))
         return 0
-    
-    def __acceptHandshake(self):
+        """
+        
+        key_exchange_cipher = AES.new(passphrase, AES.MODE_CTR, counter=Counter.new(128))
+        
+        exp1 = random.getrandbits(256)
+        
+        msg_crypt = key_exchange_cipher.encrypt(str(exp1))
+        self.sendMessage(base64.b64encode(msg_crypt))
+        
+        exp2 = None
+        
         result, error = self.receiveMessageBlocking()
+        if error == -1:
+            return -3 #a -1 (disconnection) error indicates that the other party did not accept the key, so it is cast to -3 (bad key)
+        elif error != 0:
+            return error
+        msg = base64.b64decode(result)
+        try:
+            exp2 = long(key_exchange_cipher.decrypt(msg))
+        except Exception as e:
+            return -3
+        
+        self.__shared_key = buffer(self.__intToBytes(exp1 ^ exp2, 256 / 8))
+        return 0
+    
+    def __acceptHandshake(self, passphrase):
+        """result, error = self.receiveMessageBlocking()
         
         if error != 0:
             return error
@@ -200,6 +227,28 @@ class SecureChannel(object):
         self.__shared_key = buffer(self.__intToBytes(exp1 ^ exp2, 256 / 8))
         
         return 0
+        """
+        key_exchange_cipher = AES.new(passphrase, AES.MODE_CTR, counter=Counter.new(128))
+        
+        exp1 = None
+        result, error = self.receiveMessageBlocking()
+        if error != 0:
+            return error
+        msg = base64.b64decode(result)
+        try:
+            exp1 = long(key_exchange_cipher.decrypt(msg))
+        except Exception as e:
+            return -3
+        
+        exp2 = random.getrandbits(256)
+        msg_crypt = key_exchange_cipher.encrypt(str(exp2))
+        error = self.sendMessage(base64.b64encode(msg_crypt))
+        if error == -1:
+            return -2 #a -1 (disconnection) error indicates that the other party did not accept the key, so it is cast to -2 (bad key)
+        
+        self.__shared_key = buffer(self.__intToBytes(exp1 ^ exp2, 256 / 8))
+        
+        return 0
         
     def __initSecureChannel(self):
         
@@ -218,13 +267,13 @@ class SecureChannel(object):
         
         return 0
     
-    def doHandshakes(self):
+    def doHandshakes(self, withPassphrase=None):
         ret = 0
-        
+        passphrase = SHA256.new(self.__standard_salt + str(withPassphrase)).digest()
         if self._role == self.SERVER:
-            ret = self.__startHandshake()
+            ret = self.__startHandshake(passphrase)
         else:
-            ret = self.__acceptHandshake()
+            ret = self.__acceptHandshake(passphrase)
         
         if ret != 0:
             return ret

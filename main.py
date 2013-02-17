@@ -40,5 +40,6 @@ if __name__ == '__main__':
             
         print control_return
     except Exception as e:
+        print sys.exc_info()
         with open('log.txt', 'w') as log:
-            log.write(str(e) + '\n')
+            log.write(str(sys.exc_info()) + '\n')

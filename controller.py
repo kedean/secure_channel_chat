@@ -13,6 +13,7 @@ class SecureChatController:
     __listener = None
     __chat_loop = None
     __port = 80
+    __waiting_for_passphrase = False
     
     def cleanup(self):
         if self.__chat_handler is not None:
@@ -80,20 +81,9 @@ class SecureChatController:
                 
                 if result_code == 0: #remote self.__connection was made, we are a server!
                     self.__chat_handler.pushMessage("Received connection from {0}".format(self.__connection.client_address[0]))
-                    self.__chat_handler.pushMessage("Performing handshakes", refresh=True)
-                    error = self.__connection.doHandshakes()
-                    if error != 0:
-                        self.cleanup()
-                        return (False, "{0}: Something went wrong with your handshake.".format(error))
+                    self.__chat_handler.pushMessage("Please enter your shared passphrase.", refresh=True)
+                    self.__waiting_for_passphrase = True
                     
-                    #receive clients name first
-                    other_sn, error = self.__connection.receiveMessageBlocking()
-                    if error != 0:
-                        self.cleanup()
-                        return (False, error)
-                        
-                    self.__connection.sendMessage(self.__chat_handler.screen_name)
-                    self.__chat_handler.pushMessage("Chat with {0} began on {1}".format(other_sn, Chat.dateString()), refresh=True)
             
             if code == -2: #-2 indicates the user typed the 'quit' command sequence, send an indication to the other party and exit
                 result, error = self.__connection.sendMessage(Chat.MSG_QUIT)
@@ -127,23 +117,9 @@ class SecureChatController:
                     self.__chat_handler.pushMessage("Listening for connections...", refresh=True)
                 elif result_code == 0: #remote self.__connection was made, we are a client!
                     self.__chat_handler.pushMessage("{0}...Connection established".format(self.__chat_handler.popMessage()))
-                    self.__chat_handler.pushMessage("Performing handshakes", refresh=True)
-                    error = self.__connection.doHandshakes()
-                    if error != 0:
-                        self.cleanup()
-                        return (False, "{0}: Something went wrong with your handshake.".format(error))
+                    self.__chat_handler.pushMessage("Please enter your shared passphrase.", refresh=True)
+                    self.__waiting_for_passphrase = True
                     
-                    if self.__chat_handler.screen_name == "Server":
-                        self.__chat_handler.setName("Client")
-                    
-                    #the client initiates name exchange
-                    self.__connection.sendMessage(self.__chat_handler.screen_name)
-                    other_sn, error = self.__connection.receiveMessageBlocking()
-                    if error != 0:
-                        self.cleanup()
-                        return (False, error)
-                    
-                    self.__chat_handler.pushMessage("Chat with {0} began on {1}".format(other_sn, Chat.dateString()), refresh=True)
             elif code == 1: #new screen name
                 result, error = self.__connection.sendMessage("The other party is now known as {0}".format(msg))
                 
@@ -153,18 +129,52 @@ class SecureChatController:
                 else: #success!
                     pass
             elif code == 0: #0 indicates a full messages is typed and ready to send
-                #the messages sent are a tuple of (my_screen_name, time, text)
-                #they are serialized internally
                 
-                result, error = self.__connection.sendMessage(msg)
-                
-                if error == -1: #problem!
-                    self.cleanup()
-                    return (False, "Connection was lost!")
-                elif error == 0 : #success!
-                    self.__chat_handler.pushMessage(msg)
+                if self.__waiting_for_passphrase: #the current message is treated as the users passphrase, collected and used for trading keys
+                    self.__chat_handler.pushMessage("Waiting for other party and performing handshakes", refresh=True)
+                    error = self.__connection.doHandshakes(msg)
+                    if error == -3: #the parties entered different passwords
+                        self.cleanup()
+                        return (False, "The passphrases did not match.")
+                    elif error != 0:
+                        self.cleanup()
+                        return (False, "{0}: Something went wrong with your handshake.".format(error))
+                    
+                    other_sn = None
+                    
+                    if self.__connection.connection_type == "client":
+                        if self.__chat_handler.screen_name == "Server":
+                            self.__chat_handler.setName("Client")
+                        
+                        #the client initiates name exchange
+                        self.__connection.sendMessage(self.__chat_handler.screen_name)
+                        other_sn, error = self.__connection.receiveMessageBlocking()
+                        if error != 0:
+                            self.cleanup()
+                            return (False, error)
+                    else:
+                        other_sn, error = self.__connection.receiveMessageBlocking()
+                        if error != 0:
+                            self.cleanup()
+                            return (False, error)
+                        self.__connection.sendMessage(self.__chat_handler.screen_name)
+                    
+                    self.__chat_handler.pushMessage("Chat with {0} began on {1}".format(other_sn, Chat.dateString()), refresh=True)
+                    
+                    self.__waiting_for_passphrase = False
+                else:
+                    #the messages sent are a tuple of (my_screen_name, time, text)
+                    #they are serialized internally
+                    
+                    result, error = self.__connection.sendMessage(msg)
+                    
+                    if error == -1: #problem!
+                        self.cleanup()
+                        return (False, "Connection was lost!")
+                    elif error == 0 : #success!
+                        self.__chat_handler.pushMessage(msg)
             
-            if self.__connection.connection_type is not None:
+            if self.__connection.connection_type is not None and not self.__waiting_for_passphrase:
                 #in either case we need to handle a possible receival
                 result, error = self.__connection.receiveMessage()
                 if error == -1:
