@@ -31,11 +31,14 @@ if __name__ == '__main__':
         elif arg[0] == "-":
             found_arg = arg[1:]
             
-    
-    control = SecureChatController(port, initial_screen_name, initial_connect_address, do_logging)
-    control_running, control_return = True, None
-    while control_running:
-        control_running, control_return = control.renderLoop()
-        time.sleep(FRAMESLEEP)
-        
-    print control_return
+    try:
+        control = SecureChatController(port, initial_screen_name, initial_connect_address, do_logging)
+        control_running, control_return = True, None
+        while control_running:
+            control_running, control_return = control.renderLoop()
+            time.sleep(FRAMESLEEP)
+            
+        print control_return
+    except Exception as e:
+        with open('log.txt', 'w') as log:
+            log.write(str(e) + '\n')

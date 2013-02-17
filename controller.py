@@ -61,7 +61,9 @@ class SecureChatController:
         if self.__chat_loop is not None:
             msg, code = self.__chat_loop.next()
             
+            
             if self.__connection.connection_type is None: #no self.__connection establish yet, still listening
+                
                 result, result_code = self.__listener.next()
                 
                 if result_code == 0: #remote self.__connection was made, we are a server!
@@ -82,7 +84,8 @@ class SecureChatController:
                             #print "Response was {0}".format(result)
                             break
                 else:
-                    self.__connection.sendMessage("/quit") #any message will work, so pick something simple here, just need to indicate we're closing down too
+                    pass #give no indication of acknowledement, just go
+                    #self.__connection.sendMessage("/quit") #any message will work, so pick something simple here, just need to indicate we're closing down too
                 self.cleanup()
                 return (False, "Session ended.")
             elif code == 2:

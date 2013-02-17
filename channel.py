@@ -13,15 +13,20 @@ import base64
 
 import numpy
 
-class Channel:
+class Channel(object):
+    
+    NO_CONNECTION = None
+    SERVER, CLIENT = 1, 2
+    
+    
     socket = None
     address = None
     port = 8000
     connection, client_address = None, None
-    buffer_size = 4096
-    connection_type = None
+    __buffer_size = 4096
+    _role = None
     
-    ___rsa_key = None
+    __rsa_key = None
     __rsa_keylength = 2048
     __rsa_other_pubkey = None
     __rsa_cipher = None
@@ -37,6 +42,7 @@ class Channel:
     def __init__(self, address, port):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.address, self.port = address, port
+        self._role = self.NO_CONNECTION
     def __del__(self):
         self.close()
     
@@ -47,6 +53,7 @@ class Channel:
         if self.connection is not None:
             self.connection.close()
             self.connection = None
+        self._role = self.NO_CONNECTION
     
     def sendMessage(self, message):
         if self.connection is None:
@@ -71,13 +78,17 @@ class Channel:
         
         try:
             if self.__encrypt_cipher is not None:
+                og = message
                 message = base64.b64encode(self.__encrypt_cipher.encrypt(message))
                 
                 authenticator_hasher = HMAC.new(self.__auth_send_hmac, digestmod=SHA256.new())
                 authenticator_hasher.update(message)
                 authenticator_hasher.update(str(self.__num_msg_sent))
                 authenticator = authenticator_hasher.hexdigest()
-                
+                with open('a.txt', 'a') as log:
+                    log.write('key = ' + str(self.__auth_send_hmac) + '\n')
+                    log.write(og + '\n')
+                    log.write(str(self.__num_msg_sent) + '\n')
                 message = "{0}{1}".format(authenticator, message)
                 self.__num_msg_sent += 1
         except:
@@ -91,10 +102,10 @@ class Channel:
                 return ("Success.", 0)
         
     def receiveMessage(self):
-        if self.connection is None or self.connection_type is None:
+        if self.connection is None or self._role is None:
             return ("No connection exists.", -3)
         try:
-            data = self.connection.recv(self.buffer_size)
+            data = self.connection.recv(self.__buffer_size)
             if data is not None and len(data) > 0:
                 if self.__decrypt_cipher is not None:
                     authenticator, data = data[0:64], data[64:] #the first half of any post-handshake message will be a 64-byte hex string of the authenticator, then the rest is the message
@@ -102,7 +113,11 @@ class Channel:
                     reauthentication_hasher.update(data)
                     reauthentication_hasher.update(str(self.__num_msg_recv))
                     reauthenticator = reauthentication_hasher.hexdigest()
-                    
+                    with open('b.txt', 'a') as log:
+                        log.write('key = ' + str(self.__auth_recv_hmac) + '\n')
+                        log.write(data + '\n')
+                        log.write(str(self.__num_msg_recv) + '\n')
+                        
                     if reauthenticator != authenticator:
                         return ("Authentication of message failed.", -4)
                     
@@ -200,22 +215,27 @@ class Channel:
         """
         enc_send_key, enc_recv_key, self.__auth_send_hmac, self.__auth_recv_hmac = [
             SHA256.new(str(self.__shared_key) + uniq_text).digest()
-            for uniq_text in (["a send b", "b send a", "a auth b", "b auth a"] if self.connection_type == "client" else ["b send a", "a send b", "b auth a", "a auth b"])
+            for uniq_text in (["a send b", "b send a", "a auth b", "b auth a"] if self._role == self.CLIENT else ["b send a", "a send b", "b auth a", "a auth b"])
         ]
         
         #in the case of send/recv encryption, we only need one cipher, rather than making a new one each time.
         self.__encrypt_cipher = AES.new(enc_send_key, AES.MODE_CTR, counter=Counter.new(128))
         self.__decrypt_cipher = AES.new(enc_recv_key, AES.MODE_CTR, counter=Counter.new(128))
-        
-        
     
     def doHandshakes(self):
-        if self.connection_type == "server":
+        if self._role == self.SERVER:
             self.__startHandshake()
         else:
             self.__acceptHandshake()
-        
         self.__initSecureChannel()
+    
+    @property
+    def connection_type(self): #should be refactored to be DRY-er
+        return {
+            self.NO_CONNECTION: None,
+            self.SERVER: 'server',
+            self.CLIENT: 'client'
+        }.get(self._role, None)
 
 class Listener(Channel):
     
@@ -223,8 +243,10 @@ class Listener(Channel):
         Channel.__init__(self, "", port)
     
     def listen(self):
-        while self.connection_type is None:
+        while self.connection_type is self.NO_CONNECTION:
+            
             try:
+                
                 self.socket.bind((self.address, self.port))
                 self.socket.listen(1)
                 self.socket.setblocking(0)
@@ -235,7 +257,8 @@ class Listener(Channel):
                     except:
                         yield ("No connection made.", -1)
                 self.connection.setblocking(0)
-                self.connection_type = "server"
+                
+                self._role = self.SERVER
                 
                 yield ("Success.", 0)
             except socket.error:
@@ -253,7 +276,7 @@ class Client(Channel):
             self.socket.connect((self.address, self.port))
             self.connection = self.socket
             self.connection.setblocking(0)
-            self.connection_type = "client"
+            self._role = self.CLIENT
             
             return ("Success.", 0)
         except socket.error:
