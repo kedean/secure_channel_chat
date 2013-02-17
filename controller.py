@@ -45,7 +45,10 @@ class SecureChatController:
                 self.__chat_handler.pushMessage("Listening for connections...", refresh=True)
             elif result_code == 0: #remote connection was made, we are a client!
                 self.__chat_handler.pushMessage("Performing handshakes", refresh=True)
-                self.__connection.doHandshakes()
+                error = self.__connection.doHandshakes()
+                if error != 0:
+                    self.cleanup()
+                    return (False, "{0}: Something went wrong with your handshake.".format(error))
                 self.__chat_handler.setName(initial_screen_name if initial_screen_name is not None else "Client", suppressMessage=False)
                 
                 #the client initiates name exchange
@@ -73,7 +76,6 @@ class SecureChatController:
         if self.__chat_loop is not None:
             msg, code = self.__chat_loop.next()
             
-            
             if self.__connection.connection_type is None: #no self.__connection establish yet, still listening
                 
                 result, result_code = self.__listener.next()
@@ -81,7 +83,10 @@ class SecureChatController:
                 if result_code == 0: #remote self.__connection was made, we are a server!
                     self.__chat_handler.pushMessage("Received connection from {0}".format(self.__connection.client_address[0]))
                     self.__chat_handler.pushMessage("Performing handshakes", refresh=True)
-                    self.__connection.doHandshakes()
+                    error = self.__connection.doHandshakes()
+                    if error != 0:
+                        self.cleanup()
+                        return (False, "{0}: Something went wrong with your handshake.".format(error))
                     
                     #receive clients name first
                     other_sn, error = None, -2
@@ -127,7 +132,10 @@ class SecureChatController:
                 elif result_code == 0: #remote self.__connection was made, we are a client!
                     self.__chat_handler.pushMessage("{0}...Connection established".format(self.__chat_handler.popMessage()))
                     self.__chat_handler.pushMessage("Performing handshakes", refresh=True)
-                    self.__connection.doHandshakes()
+                    error = self.__connection.doHandshakes()
+                    if error != 0:
+                        self.cleanup()
+                        return (False, "{0}: Something went wrong with your handshake.".format(error))
                     
                     if self.__chat_handler.screen_name == "Server":
                         self.__chat_handler.setName("Client")
@@ -174,6 +182,7 @@ class SecureChatController:
                 elif error == 0: #got a real message!
                     #using the previous definition, unpack the message received
                     data = result
+                    
                     if data == Chat.MSG_QUIT: #quit sequence, the other party ended their session.
                         self.cleanup()
                         return (False, "Connection was terminated by the other party.")
