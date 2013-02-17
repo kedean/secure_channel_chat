@@ -14,6 +14,7 @@ class SecureChatController:
     __chat_loop = None
     __port = 80
     __waiting_for_passphrase = False
+    __connect_to_address = None
     
     def cleanup(self):
         if self.__chat_handler is not None:
@@ -33,8 +34,9 @@ class SecureChatController:
         self.__connection = None
         self.__port = port
         
-        if initial_connect_address is not None:
-            self.__chat_handler.pushMessage("Attempting connection to {0}".format(initial_connect_address), refresh=True)
+        #if initial_connect_address is not None:
+        self.__connect_to_address = initial_connect_address
+        """self.__chat_handler.pushMessage("Attempting connection to {0}".format(initial_connect_address), refresh=True)
             
             self.__connection = Client(initial_connect_address, port)
             result, result_code = self.__connection.connect() #this one isn't non-blocking, gotta wait!
@@ -59,12 +61,12 @@ class SecureChatController:
                     self.cleanup()
                     return (False, error)
                 
-                self.__chat_handler.pushMessage("Chat with {0} began on {1}".format(other_sn, Chat.dateString()), refresh=True)
-        else:
-            self.__connection = Listener(port)
-            self.__listener = self.__connection.listen()
-            
-            self.__chat_handler.setName(initial_screen_name if initial_screen_name is not None else "Server", suppressMessage=True)
+                self.__chat_handler.pushMessage("Chat with {0} began on {1}".format(other_sn, Chat.dateString()), refresh=True)"""
+        #else:
+        self.__connection = Listener(port)
+        self.__listener = self.__connection.listen()
+        
+        self.__chat_handler.setName(initial_screen_name if initial_screen_name is not None else "Server", suppressMessage=True)
         
         self.__chat_loop = self.__chat_handler.render()
     
@@ -101,8 +103,9 @@ class SecureChatController:
                     #self.__connection.sendMessage("/quit") #any message will work, so pick something simple here, just need to indicate we're closing down too
                 self.cleanup()
                 return (False, "Session ended.")
-            elif code == 2:
-                remote_address = msg
+            elif code == 2 or self.__connect_to_address is not None:
+                remote_address = (self.__connect_to_address if self.__connect_to_address is not None else msg)
+                self.__connect_to_address = None
                 
                 self.__chat_handler.pushMessage("Attempting connection to {0}".format(remote_address), refresh=True)
                 
