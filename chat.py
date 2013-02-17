@@ -11,25 +11,34 @@ class Chat:
         self.message_queue = []
         self.screen_name = screen_name
         if log:
-            if os.path.exists("logs/") == False:
-                os.mkdir("logs/")
-            filename = "logs/log_{0}.txt".format(datetime.now())
-            log_file = open(filename, "w")
-            self.__log_file = log_file
+            self.startLogging(suppressMessage=True)
         if init:
             self.init()
         
     def __del__(self):
         self.close()
+    
     def close(self):
-        if self.__log_file is not None:
-            self.__log_file.close()
-            self.__log_file = None
+        self.stopLogging(suppressMessage=True)
         if self.__has_rendered:
             curses.endwin()
             #os.system("clear")
             self.__has_rendered = False
             
+    def startLogging(self, directory='logs', suppressMessage=False):
+        directory = '{0}/'.format(directory)
+        if os.path.exists(directory) == False:
+            os.mkdir(directory)
+        filename = "{0}/log_{1}.txt".format(directory, datetime.now())
+        log_file = open(filename, "w")
+        self.__log_file = log_file
+        self.pushMessage("Logging is now enabled.")
+    
+    def stopLogging(self, suppressMessage=False):
+        self.pushMessage("Logging is now disabled.")
+        if self.__log_file is not None:
+            self.__log_file.close()
+            self.__log_file = None
     
     def init(self):
         self.stdscr = curses.initscr()
@@ -39,8 +48,10 @@ class Chat:
         self.stdscr.nodelay(1)
         self.__has_rendered = True
         
-    def setName(self, name):
+    def setName(self, name, suppressMessage=False):
         self.screen_name = name
+        if not suppressMessage:
+            self.pushMessage("You are now known as '{0}'".format(self.screen_name))
     
     def refreshQueue(self):
         termsize = self.stdscr.getmaxyx()
@@ -64,11 +75,11 @@ class Chat:
         if isinstance(msg, str) or ((isinstance(msg, tuple) or isinstance(msg, list)) and len(msg) == 3 and isinstance(msg[0], str) and isinstance(msg[1], str) and isinstance(msg[2], str)):
             self.message_queue.append(msg)
             if self.__log_file is not None:
-                for msg in self.message_queue:
-                    plaintext = msg
-                    if not isinstance(msg, str): #for messages where the queue item is a string, just display that (like system notices), otherwise parse like usual
-                        plaintext = msg[0] + " on " + msg[1] + ": " + msg[2]
-                    self.__log_file.write(plaintext + "\n")
+                #for msg in self.message_queue:
+                plaintext = msg
+                if not isinstance(msg, str): #for messages where the queue item is a string, just display that (like system notices), otherwise parse like usual
+                    plaintext = msg[0] + " on " + msg[1] + ": " + msg[2]
+                self.__log_file.write(plaintext + "\n")
         else:
             raise TypeError("Chat messages must be either a string or a 3-tuple of strings (in format (username, timestamp, text)).")
         
@@ -131,15 +142,20 @@ class Chat:
             out_msg = "".join(msg)
             
             if out_msg[0] == "/": #forward slash at the start of a message indicates a command sequence, do not add it to the queue, only yield back the corresponding code
-                if out_msg == "/quit":
+                if out_msg == Chat.MSG_QUIT:
                     yield ("quitting", -2)
-                elif out_msg[0:len("/name ")] == "/name ":
-                    self.setName(out_msg[len("/name "):])
-                    self.pushMessage("You are now known as '{0}'".format(self.screen_name))
+                elif out_msg[0:len(Chat.MSG_NAME_CHANGE)] == Chat.MSG_NAME_CHANGE:
+                    self.setName(out_msg[len(Chat.MSG_NAME_CHANGE):])
                     #add a 'getLastMesage' so that the parent code can extract the last message on a certain return code and send it to the other party, such as this message (though modified)
                     yield (self.screen_name, 1)
-                elif out_msg[0:len("/connect ")] == "/connect ":
-                    yield (out_msg[len("/connect "):], 2)
+                elif out_msg[0:len(Chat.MSG_CONNECT)] == Chat.MSG_CONNECT:
+                    yield (out_msg[len(Chat.MSG_CONNECT):], 2)
+                elif out_msg == Chat.MSG_START_LOGGING:
+                    self.startLogging()
+                    yield ("began logging", 3)
+                elif out_msg == Chat.MSG_STOP_LOGGING:
+                    self.stopLogging()
+                    yield ("stopped logging", 4)
             else:
                 out_tuple = (self.screen_name, self.dateString(), out_msg)
                 yield (out_tuple, 0)
@@ -160,3 +176,8 @@ class Chat:
                                                                         )
         return timestamp
     
+    MSG_QUIT = "/quit"
+    MSG_NAME_CHANGE = "/nick "
+    MSG_CONNECT = "/connect "
+    MSG_START_LOGGING = "/enable logging"
+    MSG_STOP_LOGGING = "/disable logging"
