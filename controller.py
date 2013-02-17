@@ -15,6 +15,7 @@ class SecureChatController:
     __port = 80
     __waiting_for_passphrase = False
     __connect_to_address = None
+    __is_stale = False
     
     def cleanup(self):
         if self.__chat_handler is not None:
@@ -25,6 +26,7 @@ class SecureChatController:
             self.__connection = None
         self.__listener = None
         self.__chat_loop = None
+        self.__is_stale = True
     
     def __init__(self, port, initial_screen_name=None, initial_connect_address=None, do_logging=False):
         self.__chat_handler = Chat(log=do_logging)
@@ -47,9 +49,12 @@ class SecureChatController:
         self.cleanup()
     
     def renderLoop(self):
-        retval = (True, None)
+        if self.__is_stale:
+            return (False, "The chat controller has gone stale.")
         
-        if self.__chat_loop is not None:
+        elif self.__chat_loop is not None:
+            retval = (True, None)
+            
             msg, code = self.__chat_loop.next()
             
             if self.__connection.connection_type is None: #no self.__connection establish yet, still listening
@@ -78,8 +83,6 @@ class SecureChatController:
                 if error == -1: #problem!
                     self.cleanup()
                     return (False, "Connection was lost!")
-                else: #success!
-                    pass
             elif code == 0: #0 indicates a full messages is typed and ready to send
                 
                 if self.__waiting_for_passphrase: #the current message is treated as the users passphrase, collected and used for trading keys
@@ -218,3 +221,6 @@ class SecureChatController:
             #self.__connection.sendMessage("/quit") #any message will work, so pick something simple here, just need to indicate we're closing down too
         self.cleanup()
         return (False, "Session ended.")
+    
+    
+    
