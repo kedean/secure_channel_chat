@@ -53,9 +53,7 @@ class SecureChatController:
                 
                 #the client initiates name exchange
                 self.__connection.sendMessage(self.__chat_handler.screen_name)
-                other_sn, error = None, -2
-                while error == -2:
-                    other_sn, error = self.__connection.receiveMessage()
+                other_sn, error = self.__connection.receiveMessageBlocking()
                 if error != 0:
                     self.cleanup()
                     return (False, error)
@@ -89,9 +87,7 @@ class SecureChatController:
                         return (False, "{0}: Something went wrong with your handshake.".format(error))
                     
                     #receive clients name first
-                    other_sn, error = None, -2
-                    while error == -2:
-                        other_sn, error = self.__connection.receiveMessage()
+                    other_sn, error = self.__connection.receiveMessageBlocking()
                     if error != 0:
                         self.cleanup()
                         return (False, error)
@@ -142,9 +138,7 @@ class SecureChatController:
                     
                     #the client initiates name exchange
                     self.__connection.sendMessage(self.__chat_handler.screen_name)
-                    other_sn, error = None, -2
-                    while error == -2:
-                        other_sn, error = self.__connection.receiveMessage()
+                    other_sn, error = self.__connection.receiveMessageBlocking()
                     if error != 0:
                         self.cleanup()
                         return (False, error)
