@@ -6,6 +6,14 @@ from datetime import datetime
 class Chat:
     __has_rendered = False
     __log_file = None
+    __typed_message_queue = [] #a queue of everything typed into the message box (only inserted after a return, plus whatever was last typed)
+    __typed_message_pointer = 0
+    __stealth_mode = False
+    
+    def startStealthMode(self):
+        self.__stealth_mode = True
+    def stopStealthMode(self):
+        self.__stealth_mode = False
     
     def __init__(self, screen_name="_", init=False, log=False):
         self.message_queue = []
@@ -92,6 +100,10 @@ class Chat:
             self.refreshQueue()
         return item
     
+    @property
+    def prompt(self):
+        return ("Message: " if not self.__stealth_mode else "Passphrase: ")
+    
     def render(self):
         if not self.__has_rendered:
             self.init()
@@ -105,25 +117,44 @@ class Chat:
             msg = [] #set up as an array of characters so that insertion/deletion is easy (backspace/delete/etc)
             cursor = 0
             
-            self.stdscr.addstr(termsize[0]-1, 0, "Message: " + (" " * (termsize[1] - 1 - len("Message: "))))
-            self.stdscr.move(termsize[0] - 1, len("Message: "))
+            self.stdscr.move(termsize[0]-1, 0)
+            self.stdscr.clrtoeol()
+            self.stdscr.addstr(termsize[0] - 1, 0, self.prompt)
+            self.stdscr.move(termsize[0] - 1, len(self.prompt))
             
             while True:
                 c = self.stdscr.getch()
                 if c != -1:
                     if c == 10:
+                        if not self.__stealth_mode:
+                            if self.__typed_message_pointer + 1 < len(self.__typed_message_queue):
+                                self.__typed_message_queue.pop(-1)
+                                
+                            self.__typed_message_queue.append(msg)
+                            self.__typed_message_pointer = len(self.__typed_message_queue) - 1
+                        
+                        #since the return has occured, we need to cull the old message from the chat line
+                        self.stdscr.move(termsize[0]-1, 0)
+                        self.stdscr.clrtoeol()
+                        self.stdscr.addstr(termsize[0]-1, 0, self.prompt)
                         break
                     elif c == 127 and cursor > 0:
                         del msg[cursor - 1]
                         cursor -= 1
                         self.stdscr.move(termsize[0]-1, 0)
                         self.stdscr.clrtoeol()
-                        self.stdscr.addstr(termsize[0]-1, 0, "Message: " + "".join(msg))
+                        if self.__stealth_mode:
+                            self.stdscr.addstr(termsize[0]-1, 0, self.prompt + "".join("*" * len(msg)))
+                        else:
+                            self.stdscr.addstr(termsize[0]-1, 0, self.prompt + "".join(msg))
                     elif c >= 32 and c <= 126:
                         self.stdscr.move(termsize[0]-1, 0)
                         self.stdscr.clrtoeol()
                         msg.insert(cursor, chr(c))
-                        self.stdscr.addstr(termsize[0]-1, 0, "Message: " + "".join(msg))
+                        if self.__stealth_mode:
+                            self.stdscr.addstr(termsize[0]-1, 0, self.prompt + "".join('*' * len(msg)))
+                        else:
+                            self.stdscr.addstr(termsize[0]-1, 0, self.prompt + "".join(msg))
                         
                         cursor += 1
                     elif c == curses.KEY_LEFT: #left control sequence
@@ -132,10 +163,28 @@ class Chat:
                     elif c == curses.KEY_RIGHT: #right
                         if cursor < len(msg):
                             cursor += 1
+                    elif c == curses.KEY_UP and not self.__stealth_mode:
+                        if self.__typed_message_pointer >= 0:
+                            if self.__typed_message_pointer + 1 == len(self.__typed_message_queue):
+                                self.__typed_message_queue.append(msg)
+                            msg = self.__typed_message_queue[self.__typed_message_pointer]
+                            self.stdscr.move(termsize[0]-1, 0)
+                            self.stdscr.clrtoeol()
+                            self.stdscr.addstr(termsize[0]-1, 0, self.prompt + "".join(msg))
+                            cursor = len(msg)
+                            self.__typed_message_pointer -= 1
+                    elif c == curses.KEY_DOWN and not self.__stealth_mode:
+                        if self.__typed_message_pointer + 1 < len(self.__typed_message_queue):
+                            self.__typed_message_pointer += 1
+                            msg = self.__typed_message_queue[self.__typed_message_pointer]
+                            self.stdscr.move(termsize[0]-1, 0)
+                            self.stdscr.clrtoeol()
+                            self.stdscr.addstr(termsize[0]-1, 0, self.prompt + "".join(msg))
+                            cursor = len(msg)
                     else:
                         pass
                         
-                self.stdscr.move(termsize[0] - 1, len("Message: ") + cursor) #this needs to be done every time, or else the cursor will be shifted when messages are received
+                self.stdscr.move(termsize[0] - 1, len(self.prompt) + cursor) #this needs to be done every time, or else the cursor will be shifted when messages are received
                     
                 yield ("character checked.", -1)
             

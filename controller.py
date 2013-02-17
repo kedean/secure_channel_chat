@@ -83,6 +83,7 @@ class SecureChatController:
                     self.__chat_handler.pushMessage("Received connection from {0}".format(self.__connection.client_address[0]))
                     self.__chat_handler.pushMessage("Please enter your shared passphrase.", refresh=True)
                     self.__waiting_for_passphrase = True
+                    self.__chat_handler.startStealthMode()
                     
             
             if code == -2: #-2 indicates the user typed the 'quit' command sequence, send an indication to the other party and exit
@@ -119,6 +120,7 @@ class SecureChatController:
                     self.__chat_handler.pushMessage("{0}...Connection established".format(self.__chat_handler.popMessage()))
                     self.__chat_handler.pushMessage("Please enter your shared passphrase.", refresh=True)
                     self.__waiting_for_passphrase = True
+                    self.__chat_handler.startStealthMode()
                     
             elif code == 1: #new screen name
                 result, error = self.__connection.sendMessage("The other party is now known as {0}".format(msg))
@@ -131,6 +133,7 @@ class SecureChatController:
             elif code == 0: #0 indicates a full messages is typed and ready to send
                 
                 if self.__waiting_for_passphrase: #the current message is treated as the users passphrase, collected and used for trading keys
+                    self.__chat_handler.stopStealthMode()
                     self.__chat_handler.pushMessage("Waiting for other party and performing handshakes", refresh=True)
                     error = self.__connection.doHandshakes(msg)
                     if error == -3: #the parties entered different passwords
