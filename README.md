@@ -1,6 +1,6 @@
 secure_channel_chat
-copyright 2013 Kevin Dean
 ===================
+copyright 2013 Kevin Dean
 
 Test implementation of a secure channel based chat system.
 
