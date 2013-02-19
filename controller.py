@@ -156,6 +156,7 @@ class SecureChatController:
                 self.__chat_handler.setName("Client")
             else: #implied server
                 self.__chat_handler.setName("Server")
+            self.__chat_handler.pushMessage("Use '/nick newname' to change your nickname.", refresh=True)
         
         if self.__connection.connection_type == "client":
             #the client initiates name exchange

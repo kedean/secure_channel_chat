@@ -65,7 +65,7 @@ class Chat:
     def setName(self, name, suppressMessage=False):
         self.screen_name = name
         if not suppressMessage:
-            self.pushMessage("You are now known as '{0}'".format(self.screen_name))
+            self.pushMessage("You are now known as {0}".format(self.screen_name))
     
     def refreshQueue(self, refreshMessage=False):
         termsize = self.stdscr.getmaxyx()
@@ -175,7 +175,7 @@ class Chat:
                         if cursor < len(self.__msg):
                             cursor += 1
                     elif c == curses.KEY_UP and not self.__stealth_mode:
-                        if self.__typed_message_pointer >= 0:
+                        if self.__typed_message_pointer >= 0 and len(self.__typed_message_queue) > 0:
                             if self.__typed_message_pointer + 1 == len(self.__typed_message_queue):
                                 self.__typed_message_queue.append(self.__msg)
                             self.__msg = self.__typed_message_queue[self.__typed_message_pointer]
@@ -185,7 +185,7 @@ class Chat:
                             cursor = len(self.__msg)
                             self.__typed_message_pointer -= 1
                     elif c == curses.KEY_DOWN and not self.__stealth_mode:
-                        if self.__typed_message_pointer + 1 < len(self.__typed_message_queue):
+                        if self.__typed_message_pointer + 1 < len(self.__typed_message_queue) and len(self.__typed_message_queue) > 0:
                             self.__typed_message_pointer += 1
                             self.__msg = self.__typed_message_queue[self.__typed_message_pointer]
                             self.stdscr.move(termsize[0]-1, 0)

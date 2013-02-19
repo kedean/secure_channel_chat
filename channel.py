@@ -41,6 +41,17 @@ class SecureChannel(object):
     
     __standard_salt = "i am a message salt!"
     
+    def __constant_time_equality(self, a, b):
+        if len(a) != len(b):
+            return False
+        
+        diffs = 0
+        for l1, l2 in zip(a, b):
+            hasDiff = (l1 == l2)
+            diffs += int(hasDiff)
+        return (diffs != 0)
+        
+    
     def __init__(self, address, port):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.address, self.port = address, port
@@ -112,7 +123,7 @@ class SecureChannel(object):
                     reauthentication_hasher.update(str(self.__num_msg_recv))
                     reauthenticator = reauthentication_hasher.hexdigest()
                     
-                    if reauthenticator != authenticator:
+                    if not self.__constant_time_equality(authenticator, reauthenticator):
                         return ("Authentication of message failed.", -4)
                     
                     self.__num_msg_recv += 1
