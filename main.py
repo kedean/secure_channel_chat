@@ -14,7 +14,6 @@ if __name__ == '__main__':
     initial_connect_address = None
     initial_screen_name = None
     do_logging = "-log" in sys.argv
-    
     for arg in sys.argv:
         if found_arg is not None:
             if found_arg == "address" or found_arg == "a":
@@ -43,3 +42,4 @@ if __name__ == '__main__':
         print sys.exc_info()
         with open('log.txt', 'w') as log:
             log.write(str(sys.exc_info()) + '\n')
+
