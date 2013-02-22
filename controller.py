@@ -100,14 +100,20 @@ class SecureChatController:
                 else:
                     retval = self.__eventQueuedMessage(msg)
                     if retval[0] == False:
-                        self.cleanup()
-                        return retval
+                        self.__chat_handler.pushMessage(retval[1], refresh=True)
+                        retval = self.__eventConnectionAsListener()
+                        if retval[0] == False:
+                            self.cleanup()
+                            return retval
             
             if self.__connection.connection_type is not None and not self.__waiting_for_passphrase:
                 retval = self.__eventTryReceivingMessage(msg)
                 if retval[0] == False:
-                    self.cleanup()
-                    return retval
+                    self.__chat_handler.pushMessage(retval[1], refresh=True)
+                    retval = self.__eventConnectionAsListener()
+                    if retval[0] == False:
+                        self.cleanup()
+                        return retval
             
             #a -2 error code means nothing has occured, so we'll go ahead and keep moving
             return retval
