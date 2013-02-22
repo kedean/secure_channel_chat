@@ -11,13 +11,10 @@ from Crypto.Hash import HMAC
 
 import base64
 
-import numpy
-
 class SecureChannel(object):
     
     NO_CONNECTION = None
     SERVER, CLIENT = 1, 2
-    
     
     socket = None
     address = None
@@ -292,6 +289,9 @@ class SecureChannel(object):
             self.SERVER: 'server',
             self.CLIENT: 'client'
         }.get(self._role, None)
+    @property
+    def role(self):
+        return self._role
 
 class Listener(SecureChannel):
     

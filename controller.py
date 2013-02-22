@@ -31,14 +31,12 @@ class SecureChatController:
     def __init__(self, port, initial_screen_name=None, initial_connect_address=None, do_logging=False):
         self.__chat_handler = Chat(log=do_logging)
         self.__chat_handler.init()
-        self.__chat_handler.pushMessage("Listening for connections...")
         
         self.__port = port
         
         self.__connect_to_address = initial_connect_address
         
-        self.__connection = Listener(port)
-        self.__listener = self.__connection.listen()
+        self.__eventConnectionAsListener()
         
         if initial_screen_name is None:
             self.__chat_handler.setName("_", suppressMessage=True)
@@ -62,6 +60,7 @@ class SecureChatController:
             if self.__connection.connection_type is None: #no self.__connection establish yet, still listening
                 retval = self.__eventTryListener()
                 if retval[0] == False:
+                    self.cleanup()
                     return retval
             
             if self.__connect_to_address is not None:
@@ -69,15 +68,18 @@ class SecureChatController:
                 self.__connect_to_address = None
                 retval = self.__eventConnectionAsClient(addr)
                 if retval[0] == False:
+                    self.cleanup()
                     return retval
             
             if code == -2: #-2 indicates the user typed the 'quit' command sequence, send an indication to the other party and exit
                 retval = self.__eventQueuedQuit()
                 if retval[0] == False:
+                    self.cleanup()
                     return retval
             elif code == 2:
                 retval = self.__eventConnectionAsClient(msg)
                 if retval[0] == False:
+                    self.cleanup()
                     return retval
             elif code == 1: #new screen name
                 result, error = self.__connection.sendMessage("The other party is now known as {0}".format(msg))
@@ -90,22 +92,36 @@ class SecureChatController:
                 if self.__waiting_for_passphrase: #the current message is treated as the users passphrase, collected and used for trading keys
                     retval = self.__eventQueuedPassphrase(msg)
                     if retval[0] == False:
-                        return retval
+                        self.__chat_handler.pushMessage(retval[1], refresh=True)
+                        retval = self.__eventConnectionAsListener()
+                        if retval[0] == False:
+                            self.cleanup()
+                            return retval
                 else:
                     retval = self.__eventQueuedMessage(msg)
                     if retval[0] == False:
+                        self.cleanup()
                         return retval
             
             if self.__connection.connection_type is not None and not self.__waiting_for_passphrase:
                 retval = self.__eventTryReceivingMessage(msg)
                 if retval[0] == False:
+                    self.cleanup()
                     return retval
             
             #a -2 error code means nothing has occured, so we'll go ahead and keep moving
             return retval
         else:
+            self.cleanup()
             return (False, "No chat window.")
     
+    def __eventConnectionAsListener(self):
+        self.__connection = Listener(self.__port)
+        self.__listener = self.__connection.listen()
+        self.__chat_handler.pushMessage("Listening for connections...", refresh=True)
+        
+        return (True, None)
+        
     def __eventConnectionAsClient(self, remote_address):
         self.__chat_handler.pushMessage("Attempting connection to {0}".format(remote_address), refresh=True)
         
@@ -115,10 +131,9 @@ class SecureChatController:
         result, result_code = self.__connection.connect() #this one isn't non-blocking, gotta wait!
         if result_code == -3: #self.__connection refusal occurred
             self.__connection.close()
-            self.__connection = Listener(self.__port)
-            self.__listener = self.__connection.listen()
             self.__chat_handler.pushMessage("The connection was refused!")
-            self.__chat_handler.pushMessage("Listening for connections...", refresh=True)
+            
+            return self.__eventConnectionAsListener()
         elif result_code == 0: #remote self.__connection was made, we are a client!
             self.__chat_handler.pushMessage("{0}...Connection established".format(self.__chat_handler.popMessage()))
             self.__chat_handler.pushMessage("Please enter your shared passphrase.", refresh=True)
@@ -143,10 +158,8 @@ class SecureChatController:
         self.__chat_handler.pushMessage("Waiting for other party and performing handshakes", refresh=True)
         error = self.__connection.doHandshakes(phrase)
         if error == -3: #the parties entered different passwords
-            self.cleanup()
             return (False, "The passphrases did not match.")
         elif error != 0:
-            self.cleanup()
             return (False, "{0}: Something went wrong with your handshake.".format(error))
         
         other_sn = None
@@ -163,12 +176,10 @@ class SecureChatController:
             self.__connection.sendMessage(self.__chat_handler.screen_name)
             other_sn, error = self.__connection.receiveMessageBlocking()
             if error != 0:
-                self.cleanup()
                 return (False, error)
         else:
             other_sn, error = self.__connection.receiveMessageBlocking()
             if error != 0:
-                self.cleanup()
                 return (False, error)
             self.__connection.sendMessage(self.__chat_handler.screen_name)
         
@@ -185,7 +196,6 @@ class SecureChatController:
         result, error = self.__connection.sendMessage(msg)
         
         if error == -1: #problem!
-            self.cleanup()
             return (False, "Connection was lost!")
         elif error == 0 : #success!
             self.__chat_handler.pushMessage(msg)
@@ -196,17 +206,14 @@ class SecureChatController:
         #in either case we need to handle a possible receival
         result, error = self.__connection.receiveMessage()
         if error == -1:
-            self.cleanup()
             return (False, "Connection was terminated by other party.")
         elif error == -4: #bad authentication
-            self.cleanup()
             return (False, "Message contained a bad authenticator, a message was lost in transit or someone is modifying your communications, halting.")
         elif error == 0: #got a real message!
             #using the previous definition, unpack the message received
             data = result
             
             if data == Chat.MSG_QUIT: #quit sequence, the other party ended their session.
-                self.cleanup()
                 return (False, "Connection was terminated by the other party.")
             else:
                 self.__chat_handler.pushMessage(data, refresh=True)
@@ -225,7 +232,6 @@ class SecureChatController:
         else:
             pass #give no indication of acknowledement, just go
             #self.__connection.sendMessage("/quit") #any message will work, so pick something simple here, just need to indicate we're closing down too
-        self.cleanup()
         return (False, "Session ended.")
     
     
