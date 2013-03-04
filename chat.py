@@ -69,16 +69,32 @@ class Chat:
     
     def refreshQueue(self, refreshMessage=False):
         termsize = self.stdscr.getmaxyx()
-        subqueue = self.message_queue
-        
+        subqueue = [[i, msg] for i, msg in enumerate(self.message_queue)]
         if len(self.message_queue) > termsize[0] - 2:
-            subqueue = self.message_queue[0 - (termsize[0] - 2):]
+            subqueue = subqueue[0 - (termsize[0] - 2):]
         
         for y in range(0, termsize[0] - 2):
             try:
-                plaintext = subqueue[y]
-                if not isinstance(subqueue[y], str): #for messages where the queue item is a string, just display that (like system notices), otherwise parse like usual
-                    plaintext = subqueue[y][0] + " on " + subqueue[y][1] + ": " + subqueue[y][2] #currently items are tuples of (screen_name, msg)
+                plaintext = subqueue[y][1]
+                if not isinstance(subqueue[y][1], str): #for messages where the queue item is a string, just display that (like system notices), otherwise parse like usual
+                    plaintextA = subqueue[y][1][0] + " on " + subqueue[y][1][1] + ": "
+                    plaintext = plaintextA + subqueue[y][1][2] #currently items are tuples of (screen_name, msg)
+                    if len(plaintext) > termsize[1] - 5:
+                        size = (termsize[1] - 5) - len(plaintextA)
+                        left = subqueue[y][1][2][0:size]
+                        right = subqueue[y][1][2][size:]
+                        self.message_queue[subqueue[y][0]][2] = left
+                        self.message_queue.insert(subqueue[y][0]+1, 
+                        "\t" + right)
+                        return self.refreshQueue(refreshMessage)
+                elif len(plaintext) > termsize[1] - 5:
+                    size = (termsize[1] - 5)
+                    left = plaintext[0:size]
+                    right = plaintext[size:]
+                    self.message_queue[subqueue[y][0]] = left
+                    self.message_queue.insert(subqueue[y][0]+1, "\t" + right)
+                self.stdscr.move(y, 0)
+                self.stdscr.clrtoeol()
                 self.stdscr.addstr(y, 0, plaintext)
             except IndexError:
                 pass
