@@ -1,37 +1,21 @@
 import sys
 import time
-
+import argparse
 from controller import *
 
 if __name__ == '__main__':
     
-    port = 8000
+    parser = argparse.ArgumentParser(description="A decentralized chat client implementing a secure channel for communications.")
+    parser.add_argument("-a", "--address", default=None, dest="initial_connect_address", help="Address to connect to on startup. If left blank, a broadcast is started.")
+    parser.add_argument("-p", "--port", default=8000, dest="port", help="The port number to open and broadcast connections on.", type=int) 
+    parser.add_argument("-n", "--nick", default=None, dest="initial_screen_name", help="Screen name to be given on startup.")
+    parser.add_argument("--log", dest="do_logging", action="store_true")
+    args = parser.parse_args()
     
     FRAMESLEEP = 0.01
     
-    #parse out arguments
-    found_arg = None
-    initial_connect_address = None
-    initial_screen_name = None
-    do_logging = "-log" in sys.argv
-    for arg in sys.argv:
-        if found_arg is not None:
-            if found_arg == "address" or found_arg == "a":
-                initial_connect_address = arg
-                found_arg = None
-            elif found_arg == "port" or found_arg == "p":
-                try:
-                    port = int(arg)
-                except:
-                    print("Port must be an integer value.")
-                    exit(-1)
-            elif found_arg == "name" or found_arg == "n":
-                initial_screen_name = arg
-        elif arg[0] == "-":
-            found_arg = arg[1:]
-            
     try:
-        control = SecureChatController(port, initial_screen_name, initial_connect_address, do_logging)
+        control = SecureChatController(args.port, args.initial_screen_name, args.initial_connect_address, args.do_logging)
         control_running, control_return = True, None
         while control_running:
             control_running, control_return = control.renderLoop()
