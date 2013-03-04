@@ -1,0 +1,4 @@
+/connect localhost
+hi
+floop doop
+har de har har
