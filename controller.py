@@ -160,6 +160,7 @@ class SecureChatController:
         return (True, None)
     
     def __eventQueuedPassphrase(self, phrase):
+        phrase = phrase[2]
         self.__chat_handler.stopStealthMode()
         self.__chat_handler.pushMessage("Waiting for other party and performing handshakes", refresh=True)
         error = self.__connection.doHandshakes(phrase)
